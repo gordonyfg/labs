@@ -5,6 +5,7 @@ app = Flask(__name__)
 
 # Initialize database
 def init_db():
+    """Initialize the SQLite database with the todos table if it doesn't exist."""
     conn = sqlite3.connect('todos.db')
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS todos (id INTEGER PRIMARY KEY AUTOINCREMENT, task TEXT NOT NULL)''')
@@ -15,6 +16,7 @@ init_db()
 
 @app.route('/')
 def index():
+    """Fetch all todos from the database and render the index page."""
     conn = sqlite3.connect('todos.db')
     c = conn.cursor()
     c.execute('SELECT * FROM todos')
@@ -24,6 +26,7 @@ def index():
 
 @app.route('/add', methods=['POST'])
 def add():
+    """Add a new task to the database and redirect to the index page."""
     task = request.form['task']
     conn = sqlite3.connect('todos.db')
     c = conn.cursor()
@@ -34,6 +37,7 @@ def add():
 
 @app.route('/delete/<int:todo_id>')
 def delete(todo_id):
+    """Delete a task from the database by its ID and redirect to the index page."""
     conn = sqlite3.connect('todos.db')
     c = conn.cursor()
     c.execute('DELETE FROM todos WHERE id = ?', (todo_id,))
@@ -43,6 +47,7 @@ def delete(todo_id):
 
 @app.route('/edit/<int:todo_id>', methods=['POST'])
 def edit(todo_id):
+    """Update the text of an existing task in the database and redirect to the index page."""
     task = request.form['task']
     conn = sqlite3.connect('todos.db')
     c = conn.cursor()
