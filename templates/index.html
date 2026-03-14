@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Todo List</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>My Todos</h1>
+        </header>
+
+        <form action="{{ url_for('add') }}" method="POST" class="add-todo-form">
+            <input type="text" name="task" placeholder="What needs to be done?" required autocomplete="off">
+            <button type="submit" class="btn-primary">Add Task</button>
+        </form>
+
+        <ul class="todo-list">
+            {% for todo in todos %}
+            <li class="todo-item">
+                <form action="{{ url_for('edit', todo_id=todo[0]) }}" method="POST" class="edit-form" style="display: none;">
+                    <input type="text" name="task" value="{{ todo[1] }}" class="edit-input" required>
+                    <button type="submit" class="btn-icon save-btn">Save</button>
+                    <button type="button" class="btn-icon cancel-btn" onclick="toggleEdit({{ todo[0] }})">Cancel</button>
+                </form>
+                
+                <div class="todo-content" id="content-{{ todo[0] }}">
+                    <span class="task-text">{{ todo[1] }}</span>
+                    <div class="actions">
+                        <button class="btn-icon edit-btn" onclick="toggleEdit({{ todo[0] }})">Edit</button>
+                        <a href="{{ url_for('delete', todo_id=todo[0]) }}" class="btn-icon delete-btn">Delete</a>
+                    </div>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% if not todos %}
+        <div class="empty-state">
+            <p>No tasks yet! Add one above to get started.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        function toggleEdit(id) {
+            const contentDiv = document.getElementById('content-' + id);
+            const li = contentDiv.closest('.todo-item');
+            const editForm = li.querySelector('.edit-form');
+            
+            if (editForm.style.display === 'none') {
+                contentDiv.style.display = 'none';
+                editForm.style.display = 'flex';
+            } else {
+                contentDiv.style.display = 'flex';
+                editForm.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
