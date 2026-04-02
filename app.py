@@ -13,6 +13,9 @@ if db_url.startswith("postgres://"):
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# Enable engine-level logging for Render debugging if needed
+# app.config['SQLALCHEMY_ECHO'] = True 
+
 db = SQLAlchemy(app)
 
 # Todo Model
@@ -24,8 +27,23 @@ class Todo(db.Model):
         return f'<Todo {self.task}>'
 
 # Initialize database
-with app.app_context():
-    db.create_all()
+def init_db():
+    print(f"--- DATABASE INITIALIZATION ---")
+    print(f"Using URI: {db_url.split('@')[-1] if '@' in db_url else db_url}") # Log sanitized URL
+    try:
+        with app.app_context():
+            db.create_all()
+        print("Status: SUCCESS")
+    except Exception as e:
+        print(f"Status: FAILED")
+        print(f"Error during db.create_all(): {e}")
+        # If postgres fails, we should not hide it on Render
+        if "postgresql" in db_url:
+            print("Action: Connection failed. Check DATABASE_URL and Postgres availability.")
+        raise e
+    print(f"-------------------------------")
+
+init_db()
 
 @app.route('/')
 def index():
