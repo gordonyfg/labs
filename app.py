@@ -1,8 +1,13 @@
 import os
+import sys
+
+# Immediate version check to see what environment we are in
+print(f"DEBUG: STARTUP INITIATED")
+print(f"DEBUG: PYTHON VERSION: {sys.version}")
+sys.stdout.flush()
+
 from flask import Flask, render_template, request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
-
-import sys
 
 app = Flask(__name__)
 
