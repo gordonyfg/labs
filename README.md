@@ -63,13 +63,41 @@ This repository leverages integrated developer tools for consistency and automat
 
 ---
 
+## 🚀 Deployment (GitHub & Render)
+
+This project is optimized for deployment on **Render** (as a Web Service) and works seamlessly with **GitHub**.
+
+### 🛠️ Preparing for Render
+
+Render connects directly to your GitHub repository and builds the app automatically.
+
+1. **GitHub Connection**:
+   - Push this repository to your GitHub account.
+   - Connect your GitHub account to [Render](https://render.com/).
+
+2. **Web Service Configuration**:
+   - Select **New +** > **Web Service**.
+   - Input your repository URL.
+   - **Environment**: `Python`
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `gunicorn app:app` (This uses the production-grade Gunicorn server).
+
+3. **Database (Persistence)**:
+   - By default, SQLite creates `todos.db` in the service's ephemeral storage. For persistence, you should mount a **Disk** in Render or connect to an external PostgreSQL database by setting the `DATABASE_URL` environment variable.
+
+### 📦 Key Files for GitHub/Deployment
+- `requirements.txt`: Lists all Python dependencies (`Flask`, `gunicorn`, etc.).
+- `.gitignore`: Ensures that local virtual environments and temporary database files aren't tracked.
+
+---
+
 ## 🏁 Getting Started
 
 ### Prerequisites
 - Python 3.x
-- Flask
+- Flask (for local development)
 
-### Installation
+### Local Installation
 
 1. **Clone the repository**:
    ```bash
@@ -77,7 +105,7 @@ This repository leverages integrated developer tools for consistency and automat
    cd my-agy-projects
    ```
 
-2. **Set up a virtual environment (optional but recommended)**:
+2. **Set up a virtual environment**:
    ```bash
    python3 -m venv .venv
    source .venv/bin/activate  # On Linux/macOS
@@ -86,33 +114,27 @@ This repository leverages integrated developer tools for consistency and automat
 
 3. **Install Dependencies**:
    ```bash
-   pip install Flask
+   pip install -r requirements.txt
    ```
 
-### Running the Application
+### Running Locally
 
-- **To run the To-Do Web App**:
+- **Development Server**:
   ```bash
   python app.py
   ```
-  Then visit `http://127.0.0.1:5000` in your browser.
+  Then visit `http://127.0.0.1:5000`.
 
-- **To run the Algorithm Showcase**:
+- **Production Simulation (Gunicorn)**:
   ```bash
-  python main.py
-  ```
-
-- **To run the Unit Tests**:
-  ```bash
-  python test_algorithms.py
+  gunicorn app:app
   ```
 
 ---
 
 ## 📝 Rules & Conventions
-- All code follows the **PEP 8** style guide.
-- Proprietary notice included in core modules.
-- Entry point `main.py` uses modular examples to maintain clean code architecture.
+- All code follows **PEP 8**.
+- Environment-aware configurations (e.g., `DB_PATH`) are implemented in `app.py` for cloud flexibility.
 
 ---
 
