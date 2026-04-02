@@ -1,63 +1,76 @@
-from flask import Flask, render_template, request, redirect, url_for
-import sqlite3
 import os
+from flask import Flask, render_template, request, redirect, url_for
+from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
-# Database path can be configured via environment variables for deployment
-DB_PATH = os.environ.get('DATABASE_URL', 'todos.db')
+
+# Configure Database
+# Render uses postgres://, but SQLAlchemy 1.4+ requires postgresql://
+db_url = os.environ.get('DATABASE_URL', 'sqlite:///todos.db')
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db = SQLAlchemy(app)
+
+# Todo Model
+class Todo(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    task = db.Column(db.String(200), nullable=False)
+
+    def __repr__(self):
+        return f'<Todo {self.task}>'
 
 # Initialize database
-def init_db():
-    """Initialize the SQLite database with the todos table if it doesn't exist."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS todos (id INTEGER PRIMARY KEY AUTOINCREMENT, task TEXT NOT NULL)''')
-    conn.commit()
-    conn.close()
-
-init_db()
+with app.app_context():
+    db.create_all()
 
 @app.route('/')
 def index():
     """Fetch all todos from the database and render the index page."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('SELECT * FROM todos')
-    todos = c.fetchall()
-    conn.close()
+    todos = Todo.query.all()
+    # Converting to tuples to maintain compatibility with existing template if needed,
+    # though it's better to update the template to use object attributes.
     return render_template('index.html', todos=todos)
 
 @app.route('/add', methods=['POST'])
 def add():
     """Add a new task to the database and redirect to the index page."""
-    task = request.form['task']
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('INSERT INTO todos (task) VALUES (?)', (task,))
-    conn.commit()
-    conn.close()
-    return redirect(url_for('index'))
+    task_content = request.form['task']
+    new_todo = Todo(task=task_content)
+    try:
+        db.session.add(new_todo)
+        db.session.commit()
+        return redirect(url_for('index'))
+    except Exception as e:
+        print(f"Error adding task: {e}")
+        return "There was an issue adding your task"
 
 @app.route('/delete/<int:todo_id>')
 def delete(todo_id):
     """Delete a task from the database by its ID and redirect to the index page."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('DELETE FROM todos WHERE id = ?', (todo_id,))
-    conn.commit()
-    conn.close()
-    return redirect(url_for('index'))
+    todo_to_delete = Todo.query.get_or_404(todo_id)
+    try:
+        db.session.delete(todo_to_delete)
+        db.session.commit()
+        return redirect(url_for('index'))
+    except Exception as e:
+        print(f"Error deleting task: {e}")
+        return "There was a problem deleting that task"
 
 @app.route('/edit/<int:todo_id>', methods=['POST'])
 def edit(todo_id):
     """Update the text of an existing task in the database and redirect to the index page."""
-    task = request.form['task']
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('UPDATE todos SET task = ? WHERE id = ?', (task, todo_id))
-    conn.commit()
-    conn.close()
-    return redirect(url_for('index'))
+    todo = Todo.query.get_or_404(todo_id)
+    todo.task = request.form['task']
+    try:
+        db.session.commit()
+        return redirect(url_for('index'))
+    except Exception as e:
+        print(f"Error editing task: {e}")
+        return "There was an issue updating your task"
 
 if __name__ == '__main__':
     app.run(debug=True)

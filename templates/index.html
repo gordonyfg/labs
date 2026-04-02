@@ -21,17 +21,17 @@
         <ul class="todo-list">
             {% for todo in todos %}
             <li class="todo-item">
-                <form action="{{ url_for('edit', todo_id=todo[0]) }}" method="POST" class="edit-form" style="display: none;">
-                    <input type="text" name="task" value="{{ todo[1] }}" class="edit-input" required>
+                <form action="{{ url_for('edit', todo_id=todo.id) }}" method="POST" class="edit-form" style="display: none;">
+                    <input type="text" name="task" value="{{ todo.task }}" class="edit-input" required>
                     <button type="submit" class="btn-icon save-btn">Save</button>
-                    <button type="button" class="btn-icon cancel-btn" onclick="toggleEdit({{ todo[0] }})">Cancel</button>
+                    <button type="button" class="btn-icon cancel-btn" onclick="toggleEdit({{ todo.id }})">Cancel</button>
                 </form>
                 
-                <div class="todo-content" id="content-{{ todo[0] }}">
-                    <span class="task-text">{{ todo[1] }}</span>
+                <div class="todo-content" id="content-{{ todo.id }}">
+                    <span class="task-text">{{ todo.task }}</span>
                     <div class="actions">
-                        <button class="btn-icon edit-btn" onclick="toggleEdit({{ todo[0] }})">Edit</button>
-                        <a href="{{ url_for('delete', todo_id=todo[0]) }}" class="btn-icon delete-btn">Delete</a>
+                        <button class="btn-icon edit-btn" onclick="toggleEdit({{ todo.id }})">Edit</button>
+                        <a href="{{ url_for('delete', todo_id=todo.id) }}" class="btn-icon delete-btn">Delete</a>
                     </div>
                 </div>
             </li>

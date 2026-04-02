@@ -4,6 +4,9 @@ A collection of Python scripts and applications focusing on algorithm implementa
 
 For more information, refer to the [Google Antigravity Codelab](https://codelabs.developers.google.com/getting-started-google-antigravity#10).
 
+### 🔗 Live Demo
+Check out the working application here: **[my-agy-projects.onrender.com](https://my-agy-projects.onrender.com/)**
+
 ---
 
 ## 🛠️ Environment & Developer Tools
@@ -44,6 +47,12 @@ This repository leverages integrated developer tools for consistency and automat
 
 ### 4. Entry Point
 - Use `main.py` to quickly showcase algorithm and data processing capabilities.
+
+---
+
+## 📸 Demo
+
+![Todo App Verification](./todo_app_venv_verification_1773452196883.webp)
 
 ---
 
