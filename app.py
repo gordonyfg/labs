@@ -2,7 +2,14 @@ import os
 from flask import Flask, render_template, request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 
+import sys
+
 app = Flask(__name__)
+
+# Force flush prints for Render diagnostics
+def log(msg):
+    print(msg)
+    sys.stdout.flush()
 
 # Configure Database
 # Render uses postgres://, but SQLAlchemy 1.4+ requires postgresql://
@@ -28,22 +35,27 @@ class Todo(db.Model):
 
 # Initialize database
 def init_db():
-    print(f"--- DATABASE INITIALIZATION ---")
-    print(f"Using URI: {db_url.split('@')[-1] if '@' in db_url else db_url}") # Log sanitized URL
+    log(f"--- DATABASE INITIALIZATION ---")
+    log(f"Using URI: {db_url.split('@')[-1] if '@' in db_url else db_url}") # Log sanitized URL
     try:
         with app.app_context():
             db.create_all()
-        print("Status: SUCCESS")
+        log("Status: SUCCESS")
     except Exception as e:
-        print(f"Status: FAILED")
-        print(f"Error during db.create_all(): {e}")
+        log(f"Status: FAILED")
+        log(f"Error during db.create_all(): {e}")
         # If postgres fails, we should not hide it on Render
-        if "postgresql" in db_url:
-            print("Action: Connection failed. Check DATABASE_URL and Postgres availability.")
+        if "postgresql" in db_url or "postgres" in db_url:
+            log("Action: Connection failed. Check DATABASE_URL and Postgres availability.")
         raise e
-    print(f"-------------------------------")
+    log(f"-------------------------------")
 
-init_db()
+try:
+    init_db()
+except Exception as e:
+    log(f"CRITICAL STARTUP ERROR: {e}")
+    # Don't raise here if we want to allow gunicorn to start but it's probably better to die
+    raise e
 
 @app.route('/')
 def index():
