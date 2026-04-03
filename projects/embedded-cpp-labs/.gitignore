@@ -1,0 +1,11 @@
+# Ignore build artifacts
+build/
+*.exe
+*.dll
+*.obj
+*.pdb
+
+# Other OS/IDE-specific files
+.DS_Store
+Thumbs.db
+.vscode/

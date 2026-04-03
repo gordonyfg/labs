@@ -1,0 +1,64 @@
+name: CMake GTest CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          mingw-w64-x86_64-gcc
+          mingw-w64-x86_64-cmake
+          mingw-w64-x86_64-make
+
+    - name: Cache vcpkg
+      uses: actions/cache@v3
+      with:
+        path: |
+          ${{github.workspace}}/vcpkg
+          ${{github.workspace}}/vcpkg_cache
+        key: vcpkg-${{ runner.os }}-${{ hashFiles('**/vcpkg.json') }}
+
+    - name: Install vcpkg
+      run: |
+        git clone https://github.com/Microsoft/vcpkg.git
+        .\vcpkg\bootstrap-vcpkg.bat
+
+    - name: Configure with CMake (MSYS2 shell)
+      shell: msys2 {0}
+      run: |
+        mkdir build
+        cd build
+        cmake -G "MinGW Makefiles" \
+          -DCMAKE_TOOLCHAIN_FILE="${GITHUB_WORKSPACE}/vcpkg/scripts/buildsystems/vcpkg.cmake" \
+          -DVCPKG_TARGET_TRIPLET=x64-mingw-dynamic \
+          -DCMAKE_PREFIX_PATH="${GITHUB_WORKSPACE}/vcpkg/installed/x64-mingw-dynamic" \
+          ../gtest_MinGW64_vscode_win_helloworld
+
+    - name: Build
+      shell: msys2 {0}
+      run: |
+        cd build
+        cmake --build . --config ${{env.BUILD_TYPE}}
+
+    - name: Test
+      shell: msys2 {0}
+      run: |
+        cd build
+        ctest -C ${{env.BUILD_TYPE}} --output-on-failure --verbose
+  
