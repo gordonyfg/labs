@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FlyRun 3D — Drosophila Connectome Temple Runner</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Local Three.js (No external CDN dependency) -->
+  <script src="three.min.js"></script>
+</head>
+<body>
+  <!-- 3D WebGL Canvas Container -->
+  <div id="canvas-container"></div>
+  <div id="damage-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 15; background: rgba(239, 68, 68, 0); transition: background 0.08s ease;"></div>
+
+  <!-- Top Left: Stats & Status -->
+  <div class="hud-top">
+    <div class="game-title">
+      <span>🪰 FLYRUN 3D</span>
+      <span class="badge badge-bio">MaleCNS v1.0 SNN</span>
+      <button id="btn-new-session" class="session-btn" title="Reset all learned weights and start a fresh session">
+        ↺ New Session
+      </button>
+      <button id="btn-blackbox" class="session-btn" style="background: rgba(14, 165, 233, 0.15); border-color: rgba(14, 165, 233, 0.4); color: #38bdf8;" title="Inspect flight decision-making trajectory leading to damage/crashes">
+        ✈ Black Box
+      </button>
+    </div>
+    <div class="stats-panel">
+      <div class="stat-card" style="border-color: rgba(34, 197, 94, 0.4); min-width: 105px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div class="stat-label" style="color: #4ade80;">Integrity</div>
+          <div id="stat-health" class="stat-value" style="color: #4ade80; font-size: 14px;">100%</div>
+        </div>
+        <div style="width: 100%; height: 5px; background: #1e293b; border-radius: 3px; overflow: hidden; margin-top: 4px;">
+          <div id="health-bar" style="width: 100%; height: 100%; background: #22c55e; transition: width 0.15s ease, background 0.2s ease;"></div>
+        </div>
+      </div>
+      <div class="stat-card" style="border-color: rgba(168, 85, 247, 0.4);">
+        <div class="stat-label" style="color: #c084fc;">Episode</div>
+        <div id="stat-episode" class="stat-value" style="color: #d8b4fe;">1</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Distance</div>
+        <div id="stat-dist" class="stat-value">0 m</div>
+      </div>
+      <div class="stat-card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div class="stat-label">Velocity</div>
+          <span id="brake-badge" style="font-size: 9px; color: #f59e0b; display: none; font-weight: bold; margin-left: 4px;">BRAKE</span>
+        </div>
+        <div id="stat-speed" class="stat-value">24.0 m/s</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Obstacles Cleared</div>
+        <div id="stat-cleared" class="stat-value">0</div>
+      </div>
+      <div class="stat-card" style="border-color: rgba(14, 165, 233, 0.4);">
+        <div class="stat-label" style="color: #38bdf8;">Best Distance</div>
+        <div id="stat-best" class="stat-value" style="color: #7dd3fc;">0 m</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Right: Biological Connectome HUD -->
+  <div class="hud-brain">
+    <div class="brain-header">
+      <span>CONNECTOME SNN (1 kHz)</span>
+      <span id="bridge-status" style="color: #10b981;">● ONLINE</span>
+    </div>
+    
+    <!-- 3D Rotating Drosophila Brain Point Cloud -->
+    <canvas id="brain-canvas"></canvas>
+
+    <!-- Circuit Indicators -->
+    <div class="neural-activity">
+      <div class="circuit-indicator">
+        <span>Optomotor (T4/T5 &rarr; HS):</span>
+        <span id="ind-opto" class="indicator-dot"></span>
+      </div>
+      <div class="circuit-indicator">
+        <span>Looming (LC4 &rarr; GF):</span>
+        <span id="ind-lc4" class="indicator-dot"></span>
+      </div>
+      <div class="circuit-indicator">
+        <span>Giant Fiber Takeoff:</span>
+        <span id="ind-gf" class="indicator-dot"></span>
+      </div>
+
+      <!-- Dopamine 3-Factor STDP Learning Section -->
+      <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.1);">
+        <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 3px;">
+          <span>DAN Dopamine Surge:</span>
+          <span id="dopamine-val" style="color: #34d399; font-weight: bold;">0.00</span>
+        </div>
+        <div style="width: 100%; height: 6px; background: #1e293b; border-radius: 3px; overflow: hidden; position: relative;">
+          <div id="dopamine-bar" style="width: 50%; height: 100%; background: #34d399; transition: width 0.15s ease, background 0.15s ease;"></div>
+        </div>
+      </div>
+
+      <div class="circuit-indicator" style="margin-top: 4px;">
+        <span>Kenyon Cells (APL ~7%):</span>
+        <span id="stat-kc-sparse" style="color: #38bdf8; font-weight: bold;">9 / 128</span>
+      </div>
+
+      <div class="circuit-indicator" style="margin-top: 3px;">
+        <span>MB Synapses (4&times;128):</span>
+        <span id="stat-stdp-weight" style="color: #a855f7; font-weight: bold;">W = 0.350</span>
+      </div>
+
+      <div class="circuit-indicator">
+        <span>Inference Latency:</span>
+        <span id="stat-latency" style="color: #38bdf8; font-weight: bold;">0.71 ms</span>
+      </div>
+    </div>
+
+    <!-- Compound Eye 48x48 Retina Inset -->
+    <div class="eye-inset">
+      <canvas id="eye-canvas" width="48" height="48"></canvas>
+      <div style="flex: 1; min-width: 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 10px; font-weight: 700; color: #38bdf8; letter-spacing: 0.5px;">COMPOUND EYE</span>
+          <span id="eye-looming-badge" style="font-size: 8px; font-weight: 700; padding: 1px 5px; border-radius: 3px; background: rgba(34, 197, 94, 0.2); color: #4ade80;">CLEAR</span>
+        </div>
+        <div style="font-size: 9px; color: #94a3b8; margin-top: 2px;">48&times;48 Ommatidia Array</div>
+        <div id="eye-status" style="font-size: 8.5px; color: #64748b; font-family: monospace; margin-top: 2px;">Flow: 24.0 m/s | Loom: 0.00</div>
+      </div>
+    </div>
+
+    <!-- Live Training Convergence Telemetry Graph -->
+    <div class="telemetry-panel">
+      <div class="telemetry-header">
+        <span>LEARNING CONVERGENCE</span>
+        <div class="telemetry-legend">
+          <span class="legend-dot" style="background: #38bdf8;"></span>Dist
+          <span class="legend-dot" style="background: #c084fc; margin-left: 6px;"></span>W
+        </div>
+      </div>
+      <canvas id="telemetry-canvas" width="226" height="74"></canvas>
+      <div class="telemetry-footer">
+        <span id="telemetry-ep-range">Episode 1</span>
+        <span id="telemetry-avg-dist">Avg: 0 m</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Mode Controls -->
+  <div class="hud-bottom">
+    <button id="btn-mode" class="mode-btn active">
+      <span>🪰 Fly Brain Mode (Auto-Pilot)</span>
+    </button>
+    <div class="status-tag">Controls: Left/Right [A/D], Jump [W/Space], Slide [S/Down]</div>
+  </div>
+
+  <!-- Game Over Screen -->
+  <div id="game-over-modal">
+    <h2>OBSTACLE COLLISION</h2>
+    <p id="game-over-score" style="color: #94a3b8; font-size: 18px;">Distance: 0 m</p>
+    <div id="countdown-msg" style="color: #38bdf8; font-size: 16px; margin: 4px 0 12px; font-weight: 600;">
+      Next Training Episode in <span id="countdown-num" style="color: #facc15; font-size: 26px; font-weight: 800;">3</span>s...
+    </div>
+    <!-- Detailed Failure Diagnostic & Obstacle Breakdown -->
+    <div id="game-over-diagnosis" style="background: rgba(15, 23, 42, 0.90); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 8px; padding: 10px 18px; max-width: 480px; text-align: center; font-size: 12px; color: #cbd5e1; display: flex; flex-direction: column; gap: 5px; box-shadow: 0 4px 16px rgba(0,0,0,0.5);">
+      <div id="crash-cause-title" style="color: #f87171; font-weight: 700; font-size: 14px;">Collision: HURDLE</div>
+      <div id="crash-cause-detail" style="color: #94a3b8; font-family: monospace; font-size: 11px;">Cause: Analyzing event...</div>
+      <div id="crash-stats-bar" style="margin-top: 4px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 11px; color: #38bdf8;">
+        Failure History: 💥 Hurdle 0% | 🏹 Arch 0% | 🗿 Monolith 0%
+      </div>
+    </div>
+    <button id="btn-restart" class="restart-btn" style="margin-top: 8px;">RESPAWN NOW</button>
+  </div>
+
+  <!-- Black Box Telemetry Inspector Modal -->
+  <div id="blackbox-modal" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(3, 7, 18, 0.88); backdrop-filter: blur(8px); z-index: 50; align-items: center; justify-content: center;">
+    <div style="background: #0f172a; border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 12px; padding: 20px 24px; width: 840px; max-width: 94vw; max-height: 85vh; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); color: #e2e8f0;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">
+        <div style="font-size: 16px; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 8px;">
+          <span>✈ FLIGHT DATA RECORDER (BLACK BOX)</span>
+          <span id="bb-status-badge" style="font-size: 11px; padding: 2px 8px; border-radius: 4px; background: #334155; color: #94a3b8;">BUFFER ACTIVE (10 Hz)</span>
+        </div>
+        <button id="btn-close-blackbox" style="background: transparent; border: none; color: #94a3b8; font-size: 24px; cursor: pointer; line-height: 1;">&times;</button>
+      </div>
+      <div id="bb-summary" style="font-size: 13px; color: #cbd5e1; line-height: 1.4; background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 6px;">
+        Continuously recording 5-second circular trajectory of sensory KC inputs, MBON valences, speed, and actions leading to collision incidents.
+      </div>
+      <div style="overflow-y: auto; max-height: 380px; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; background: #030712;">
+        <table id="bb-table" style="width: 100%; border-collapse: collapse; font-family: monospace; font-size: 11px; text-align: left;">
+          <thead style="background: #1e293b; color: #94a3b8; position: sticky; top: 0;">
+            <tr>
+              <th style="padding: 6px 10px;">T-Offset</th>
+              <th style="padding: 6px 10px;">Dist</th>
+              <th style="padding: 6px 10px;">Speed</th>
+              <th style="padding: 6px 10px;">Lane</th>
+              <th style="padding: 6px 10px;">Action</th>
+              <th style="padding: 6px 10px;">Valences (L/S/R)</th>
+              <th style="padding: 6px 10px;">KC Sensors</th>
+              <th style="padding: 6px 10px;">Obstacle Ahead</th>
+            </tr>
+          </thead>
+          <tbody id="bb-tbody">
+            <tr><td colspan="8" style="padding: 16px; text-align: center; color: #64748b;">Flight buffer active. Incidents or manual snapshots will populate here.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 4px;">
+        <span style="font-size: 11px; color: #64748b;">File log: <code>data/flight_incidents.jsonl</code></span>
+        <button id="btn-snapshot-bb" class="session-btn" style="background: rgba(56, 189, 248, 0.15); border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;">Capture Current 5s Buffer</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>

@@ -1,0 +1,86 @@
+# FlyRun Neuromorphic Circuit and Biophysics Configuration
+
+simulation:
+  dt_ms: 1.0               # Simulation time step in milliseconds (1 kHz)
+  device: "auto"           # "cuda", "cpu", or "auto"
+  seed: 42
+
+compound_eye:
+  fov_azimuth_deg: 180.0   # Horizontal field of view
+  fov_elevation_deg: 120.0 # Vertical field of view
+  resolution_azimuth: 48   # Number of ommatidial columns
+  resolution_elevation: 48 # Number of ommatidial rows
+  lamina_tau_ms: 15.0      # Time constant for high-pass contrast adaptation
+
+emd_correlator:
+  tau_delay_ms: 20.0       # Low-pass filter delay time constant for Hassenstein-Reichardt
+  spatial_step: 1          # Neighbor distance for correlation
+  directions: ["left", "right", "up", "down"]
+
+neurons:
+  # Leaky Integrate-and-Fire parameters for cell types
+  lc4:
+    tau_m_ms: 10.0
+    v_thresh: 1.0
+    v_reset: 0.0
+    v_rest: 0.0
+    tau_ref_ms: 2.0
+    r_m: 1.0
+
+  lplc2:
+    tau_m_ms: 12.0
+    v_thresh: 1.0
+    v_reset: 0.0
+    v_rest: 0.0
+    tau_ref_ms: 2.0
+    r_m: 1.0
+
+  giant_fiber:
+    tau_m_ms: 8.0          # Fast membrane integration for escape trigger
+    v_thresh: 1.5
+    v_reset: -0.2
+    v_rest: 0.0
+    tau_ref_ms: 10.0       # Extended refractory period prevents repetitive firing
+    r_m: 1.0
+
+  hs_vs:
+    tau_m_ms: 25.0         # Graded / high-capacitance tangential cell integration
+    v_thresh: 2.0
+    v_reset: 0.0
+    v_rest: 0.0
+    tau_ref_ms: 1.0
+    r_m: 1.0
+
+  kenyon_cell:
+    tau_m_ms: 15.0
+    v_thresh: 1.2
+    v_reset: 0.0
+    v_rest: 0.0
+    tau_ref_ms: 3.0
+    r_m: 1.0
+    target_sparsity: 0.05  # < 5% population activity
+
+  mbon:
+    tau_m_ms: 20.0
+    v_thresh: 1.0
+    v_reset: 0.0
+    v_rest: 0.0
+    tau_ref_ms: 2.0
+    r_m: 1.0
+
+plasticity:
+  stdp_3factor:
+    tau_eligibility_ms: 1000.0 # Eligibility trace decay time constant
+    tau_plus_ms: 20.0          # LTP window
+    tau_minus_ms: 25.0         # LTD window
+    a_plus: 0.01               # LTP magnitude
+    a_minus: 0.012             # LTD magnitude
+    learning_rate_eta: 0.05
+    weight_decay_lambda: 0.0001
+    w_min: 0.0
+    w_max: 2.0
+
+actuation:
+  jump_threshold_spikes: 1     # Single GF spike triggers escape jump
+  steering_gain: 0.8           # Gain for HS optomotor balance
+  loop_deadline_ms: 5.0        # Control loop latency deadline
