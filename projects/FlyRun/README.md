@@ -6,6 +6,10 @@ An event-driven, neuromorphic perception-and-control stack for high-speed 3D cor
 [![Latency](https://img.shields.io/badge/latency-%3C1.0ms-blue)](benchmarks/)
 [![Backend](https://img.shields.io/badge/PyTorch-sparse__csr-red)](engine/)
 
+<p align="center">
+  <img src="gameplay.gif" alt="FlyRun Autonomous Connectome Gameplay" width="800"/>
+</p>
+
 ---
 
 ## Key Features
