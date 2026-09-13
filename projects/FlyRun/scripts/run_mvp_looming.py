@@ -67,7 +67,8 @@ def run_mvp(output_plot: str = "looming_trajectory.png") -> None:
     gf_spikes_list = []
     jump_triggered_step = None
 
-    print("\nExecuting 1 kHz simulation loop (1 ms steps)...")
+    projection_sources = circuit.syn_lc4_gf.weight.to_sparse_coo().coalesce().indices()[1]
+    print("\nExecuting model steps (1 ms simulated time each; not wall-clock pacing)...")
     for t in range(num_steps):
         frame = stimulus[t]
 
@@ -76,7 +77,8 @@ def run_mvp(output_plot: str = "looming_trajectory.png") -> None:
         step_us = profiler.stop()
 
         active_spikes = int(lc4_spikes.sum().item() + gf_spikes.sum().item())
-        active_syn = int(lc4_spikes.sum().item()) * 2
+        active_indices = lc4_spikes.nonzero().flatten()
+        active_syn = int(torch.isin(projection_sources, active_indices).sum().item())
         energy.record_step(active_spikes, active_syn, num_lc4 + 2)
 
         timestamps_ms.append(float(t))
@@ -106,13 +108,13 @@ def run_mvp(output_plot: str = "looming_trajectory.png") -> None:
     print(f"Total Spikes Emitted:      {en_stats['total_spikes']}")
     print(f"Total Synaptic Operations: {en_stats['total_synops']}")
     print(f"Avg SynOps per Step:       {en_stats['avg_synops_per_step']:.2f}")
-    print(f"Estimated Dynamic Power:   {en_stats['estimated_power_mW_at_1kHz']:.4f} mW (at 1 kHz)")
+    print(f"Hypothetical operation-model power:   {en_stats['estimated_power_mW_at_1kHz']:.4f} mW (at 1 kHz)")
 
     print(f"\n--- Escape Behavior Validation ---")
     if jump_triggered_step is not None:
         ttc = t_collision - jump_triggered_step
         print(f"SUCCESS: Escape takeoff fired {ttc} ms BEFORE predicted physical collision.")
-        print(f"Biological fly take-off reflex window: 15-45 ms prior to collision.")
+        print(f"This stimulus test does not simulate successful physical obstacle clearance.")
     else:
         print("FAILURE: Escape reflex was not triggered.")
         sys.exit(1)

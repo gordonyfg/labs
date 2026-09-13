@@ -40,6 +40,8 @@ class MushroomBodyCircuit(nn.Module):
         self.num_kc = num_kc
         self.num_mbon = num_mbon
         self.dt_ms = dt_ms
+        if not 0 < target_kc_sparsity <= 1:
+            raise ValueError("target_kc_sparsity must be in (0, 1]")
         self.target_sparsity = target_kc_sparsity
         self.device = torch.device(device)
 
@@ -144,7 +146,8 @@ class MushroomBodyCircuit(nn.Module):
         kc_net_current = torch.clamp(kc_drive - apl_inhibition, min=0.0)
 
         # 3. Step Kenyon Cell Population
-        kc_spikes, kc_v = self.kc(i_ext=kc_net_current)
+        kc_spikes, kc_v = self.kc(i_ext=kc_net_current,
+                                   max_spikes=int(self.num_kc * self.target_sparsity))
 
         # 4. KC -> MBON Synaptic Current via STDP weights
         mbon_syn_current = self.kc_to_mbon_synapses(kc_spikes)

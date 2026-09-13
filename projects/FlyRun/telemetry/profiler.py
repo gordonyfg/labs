@@ -66,9 +66,13 @@ class EnergyEstimator:
         self.total_spikes: int = 0
         self.total_synops: int = 0
         self.total_steps: int = 0
+        self.total_neuron_updates: int = 0
 
     def record_step(self, active_spikes: int, active_synapses: int, total_neurons: int) -> None:
+        if min(active_spikes, active_synapses, total_neurons) < 0:
+            raise ValueError("Operation counts must be nonnegative")
         self.total_steps += 1
+        self.total_neuron_updates += total_neurons
         self.total_spikes += active_spikes
         self.total_synops += active_synapses
 
@@ -78,18 +82,20 @@ class EnergyEstimator:
             return {}
 
         total_energy_pJ = (self.total_synops * self.pJ_per_synop) + (
-            self.total_steps * self.pJ_per_neuron
+            self.total_neuron_updates * self.pJ_per_neuron
         )
         total_energy_uJ = total_energy_pJ / 1e6
         avg_synops_per_step = self.total_synops / self.total_steps
         avg_spikes_per_step = self.total_spikes / self.total_steps
 
         return {
+            "model": "Assumed operation energy; not measured device power",
+            "total_neuron_updates": self.total_neuron_updates,
             "total_steps": self.total_steps,
             "total_spikes": self.total_spikes,
             "total_synops": self.total_synops,
             "avg_spikes_per_step": avg_spikes_per_step,
             "avg_synops_per_step": avg_synops_per_step,
             "total_energy_microjoules": total_energy_uJ,
-            "estimated_power_mW_at_1kHz": (total_energy_pJ * 1000.0) / 1e9,
+            "estimated_power_mW_at_1kHz": (total_energy_pJ / self.total_steps) * 1000.0 / 1e9,
         }

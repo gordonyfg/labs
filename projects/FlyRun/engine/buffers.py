@@ -7,10 +7,12 @@ import torch
 class SpikeRingBuffer:
     """Pre-allocated circular buffer storing spike events over a temporal window.
 
-    Guarantees O(1) in-place insertion with zero memory reallocation.
+    Insertion copies O(num_units) values into preallocated storage.
     """
 
     def __init__(self, capacity: int, num_units: int, dtype: torch.dtype = torch.float32, device: torch.device | str = "cpu"):
+        if capacity <= 0 or num_units <= 0:
+            raise ValueError("capacity and num_units must be positive")
         self.capacity = capacity
         self.num_units = num_units
         self.device = torch.device(device)
@@ -39,10 +41,12 @@ class SpikeRingBuffer:
         """Retrieve the last `window_size` steps in chronological order.
         
         Returns:
-            Tensor of shape (window_size, num_units).
+            Copy of shape (available_steps, num_units); this operation allocates.
         """
-        if window_size is None or window_size > self.capacity:
-            window_size = min(self.capacity, self.total_steps)
+        if window_size is not None and window_size < 0:
+            raise ValueError("window_size must be nonnegative")
+        window_size = min(self.capacity, self.total_steps,
+                          self.capacity if window_size is None else window_size)
             
         if window_size == 0:
             return torch.empty((0, self.num_units), dtype=self.dtype, device=self.device)
@@ -61,6 +65,8 @@ class StateTraceBuffer:
     """Float ring buffer for continuous variables such as membrane potentials or currents."""
 
     def __init__(self, capacity: int, num_units: int, device: torch.device | str = "cpu"):
+        if capacity <= 0 or num_units <= 0:
+            raise ValueError("capacity and num_units must be positive")
         self.capacity = capacity
         self.num_units = num_units
         self.device = torch.device(device)
@@ -77,9 +83,11 @@ class StateTraceBuffer:
         self.total_steps += 1
 
     def window(self, window_size: int | None = None) -> torch.Tensor:
-        """Retrieve chronological history."""
-        if window_size is None or window_size > self.capacity:
-            window_size = min(self.capacity, self.total_steps)
+        """Retrieve a chronological copy of available history."""
+        if window_size is not None and window_size < 0:
+            raise ValueError("window_size must be nonnegative")
+        window_size = min(self.capacity, self.total_steps,
+                          self.capacity if window_size is None else window_size)
         if window_size == 0:
             return torch.empty((0, self.num_units), dtype=torch.float32, device=self.device)
         indices = [(self.head - window_size + i) % self.capacity for i in range(window_size)]

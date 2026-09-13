@@ -165,7 +165,10 @@ class LoomingEscapeCircuit(nn.Module):
         else:
             # Darkening edge: previous frame was brighter than current frame
             # I_contrast = max(0, prev - current)
-            temporal_contrast = torch.clamp(self.prev_frame - frame, min=0.0)
+            # Remove additive whole-field illumination shifts. This is a contrast
+            # transient heuristic, not a validated radial-motion detector.
+            difference = self.prev_frame - frame
+            temporal_contrast = torch.clamp(difference - difference.median(), min=0.0)
             self.prev_frame.copy_(frame)
 
         # 2. Receptive Field Integration for LC4 Population via precomputed sparse projection

@@ -1,147 +1,105 @@
-# Project FlyRun: Biological Reflex Architecture for Autonomous Navigation
+# FlyRun: Drosophila-inspired navigation experiments
 
-An event-driven, neuromorphic perception-and-control stack for high-speed 3D corridor navigation derived directly from the *Drosophila melanogaster* connectome (MaleCNS v1.0 / FlyWire / Hemibrain).
+FlyRun combines a browser runner with hand-written avoidance rules and a sparse,
+reward-modulated associative controller. Separate Python experiments explore
+Leaky Integrate-and-Fire (LIF) neurons, contrast-transient escape responses,
+Hassenstein–Reichardt motion correlators, and three-factor STDP.
 
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen)](tests/)
-[![Latency](https://img.shields.io/badge/latency-%3C1.0ms-blue)](benchmarks/)
-[![Backend](https://img.shields.io/badge/PyTorch-sparse__csr-red)](engine/)
+**This is a bio-inspired prototype, not a reconstruction of a measured fly
+connectome.** Gameplay does not establish biological fidelity, learning benefits,
+a sub-millisecond end-to-end deadline, or measured low-power operation.
 
-<p align="center">
-  <img src="gameplay.gif" alt="FlyRun Autonomous Connectome Gameplay" width="800"/>
-</p>
+<p align="center"><img src="gameplay.gif" alt="Illustrative FlyRun gameplay from an earlier version" width="800"/></p>
 
----
+## What runs where
 
-## Key Features
+| Component | Implemented behavior | Limits |
+|---|---|---|
+| Browser autopilot | Exact game-state features → 24 inputs → up to 9 active features among 128 KC-like units → four action preferences, combined with avoidance rules | Continuous activations, not a spiking network; rules use obstacle identity and distance directly |
+| Browser learning | Reward × action eligibility × KC-like activation; one-second eligibility decay in simulated time | Not spike-timing-dependent plasticity; improvement has not been demonstrated against a frozen-learning baseline |
+| Browser eye and brain display | Illustrations and policy indicators | Not the controller's visual input or measured anatomical connectivity |
+| Python circuits | Independent LIF, STDP and motion/contrast experiments | Hand-built connectivity; not connected to browser actuation |
+| Python server | Static files and WebSocket incident logging | Connecting it does not enable a Python neural controller |
+| Data exporter | NeuPrint extraction or explicitly requested synthetic examples, with provenance manifests | Exported graphs are not loaded by the current circuits; measured counts do not validate assumed effective weights |
 
-1. **Biological Drosophila Sub-Circuits**:
-   - **Looming Collision Reflex (`circuits/looming.py`)**: Lobula Columnar (LC4, LPLC2) neurons projecting onto descending Giant Fiber (GF / DNp01) motor neurons for emergency takeoff (jump/slide).
-   - **Directional Optomotor Stabilization (`circuits/optomotor.py`)**: Hassenstein-Reichardt Elementary Motion Detectors (EMDs, T4/T5) feeding into Lobula Plate Horizontal (HS) and Vertical (VS) tangential cells for yaw balance and lane centering.
-   - **Contextual Adaptation (`circuits/mushroom_body.py`)**: Kenyon Cell sparse population coding ($< 5\%$ sparsity via APL feedback) and Mushroom Body Output Neurons (MBONs) modulated by Dopaminergic Neurons (PPL1/PAM) using **3-Factor STDP** with synaptic eligibility traces.
-2. **Neuromorphic Spiking Engine (`engine/`)**:
-   - Vectorized Leaky Integrate-and-Fire (LIF) dynamics with exact exponential decay at 1 kHz ($\Delta t = 1.0\text{ ms}$).
-   - Memory-efficient `torch.sparse_csr_tensor` graph propagation with $\mathcal{O}(E)$ complexity.
-   - Zero-copy circular ring buffers for spike histories and continuous traces (`engine/buffers.py`).
-3. **Connectome Data Pipeline (`data/`)**:
-   - Dual-mode extraction: Automated Cypher query generation for NeuPrint API (`neuprint-python`) and validated offline compressed Parquet caches with neurotransmitter polarity mapping ($\text{ACh} > 0$, $\text{GABA/Glut} < 0$).
-4. **Sub-Millisecond Edge Performance (`benchmarks/`)**:
-   - Single-step inference latency: **~0.70 ms median** on standard CPU, beating the $< 1.0\text{ ms}$ edge latency deadline.
-   - Neuromorphic energy profiling: Tracks Synaptic Operations (SynOps), spike counts, and estimated dynamic power consumption (~0.03 mW at 1 kHz).
+## Run
 
----
-
-## Directory Structure
-
-```
-FlyRun/
-├── ARCHITECTURE.md            # Deep mathematical and theoretical specification
-├── configs/
-│   └── circuits.yaml          # Biophysical parameters (tau, v_thresh, STDP)
-├── data/
-│   ├── artifacts/             # Parquet-serialized connectome subgraphs
-│   ├── neuprint_client.py     # NeuPrint API Cypher query interface
-│   ├── export_subgraphs.py    # Subgraph extraction CLI
-│   └── synthetic_subgraphs.py # Biological ground-truth topology generator
-├── engine/
-│   ├── lif.py                 # Vectorized sparse PyTorch LIF simulation backend
-│   ├── buffers.py             # Zero-allocation circular spike ring buffers
-│   └── stdp.py                # 3-Factor STDP with synaptic eligibility traces
-├── circuits/
-│   ├── looming.py             # LC4/LPLC2 -> Giant Fiber collision reflex
-│   ├── optomotor.py           # T4/T5 EMD -> Lobula Plate HS/VS heading circuit
-│   └── mushroom_body.py       # Kenyon Cells -> MBONs with dopamine modulation
-├── sim/
-│   ├── corridor.py            # Procedural 3D corridor runner environment
-│   └── eye.py                 # 48x48 compound eye ommatidia optical model
-├── telemetry/
-│   ├── profiler.py            # Microsecond timer and SynOps / energy estimator
-│   └── visualizer.py          # Spike raster and membrane potential plotter
-├── tests/
-│   ├── test_lif.py            # Unit tests for LIF dynamics & ring buffers
-│   └── test_circuits.py       # Deterministic validation for biological circuits
-├── scripts/
-│   └── run_mvp_looming.py     # Phase 1 MVP end-to-end runnable demonstration
-└── benchmarks/
-    └── benchmark_latency.py   # Latency benchmarks against < 1.0 ms deadline
-```
-
----
-
-## Quick Start
-
-### 1. Installation
+From `projects/FlyRun`:
 
 ```bash
-# Create virtual environment with uv
 uv venv --python 3.12 .venv
 source .venv/bin/activate
-
-# Install dependencies and editable package
 uv pip install -e .
+python scripts/run_game_bridge.py
 ```
 
-### 2. Launch Interactive 3D Temple Runner Web Simulation & Connectome HUD
+Open http://localhost:8080. Autopilot starts enabled; use the mode button for manual
+play (arrows/WASD). The optional logger writes incident files under `data/`.
+The HUD's controller compute time is measured locally and excludes rendering,
+physics, input waiting and transport. Control runs once per animation frame.
 
-FlyRun includes a full 3D browser-based corridor navigation game wired in real time to the biological connectome:
+For a fresh, seeded run use `http://localhost:8080/?seed=42&fresh=1`; add
+`&learning=off` for a frozen-weight comparison. Seeded/fresh runs do not read or
+write saved sessions. The seed controls obstacle generation, not rendering or
+frame timing. Replaying the same initial seed is necessary but not sufficient
+for identical trajectories across frame rates.
 
-```bash
-# Start the HTTP server (port 8080) and WebSocket SNN bridge (port 8765)
-python3 scripts/run_game_bridge.py
-```
-Open **`http://localhost:8080`** in any modern web browser.
-- **Auto-Pilot Mode**: Click `🪰 Fly Brain Mode` to let the 24-PN / 128-KC / 4-MBON network navigate autonomously.
-- **Manual Mode**: Control with Arrow keys / WASD (Up = Jump, Down = Slide, Left/Right = Steer).
-- **Live Connectome HUD**: Real-time 3D brain point cloud, 48x48 compound eye ommatidia visualization, 9/128 KC sparsity readout, and 3-factor STDP weight convergence curve.
-- **10 Hz Flight Data Recorder (Black Box)**: Click `✈ Black Box` to inspect incident forensics, kinematics, and synaptic valences.
-
-### 3. Run Phase 1 MVP (Looming Stimulus to Giant Fiber Reflex)
-
-```bash
-python3 scripts/run_mvp_looming.py
-```
-Outputs trajectory telemetry and generates `looming_trajectory.png`.
-
-### 4. Run Latency Benchmarks
-
-```bash
-python3 benchmarks/benchmark_latency.py
-```
-
-### 5. Run Unit Test Suite
+## Validate
 
 ```bash
 pytest tests/ -v
+node --test tests/test_browser.cjs
+python scripts/run_mvp_looming.py
+python benchmarks/benchmark_latency.py --steps 5000 --threads 1 --seed 0
 ```
 
-### 6. Export Connectome Subgraphs
+The benchmark emits hardware/software settings, median/p95/p99/max and the
+fraction of steps missing a 1 ms target. Add `--require-deadline` to fail on any
+observed miss. Passing a finite benchmark does not guarantee future deadlines.
+The MVP tests an expanding synthetic disk, not successful physical navigation.
 
-To query live Janelia NeuPrint servers (requires authentication token):
+The escape circuit removes additive whole-field brightness shifts before
+integrating OFF contrast. It remains a contrast heuristic: selectivity against
+translation, patterned lighting, and other non-looming stimuli is not established.
+The Python KC model applies an explicit top-k spike cap alongside feedback;
+this engineering constraint is not a validated biological APL model.
+
+## Data provenance
+
 ```bash
 export NEUPRINT_APPLICATION_CREDENTIALS="<YOUR_TOKEN>"
-python3 data/export_subgraphs.py --dataset hemibrain:v1.2.1
-```
-Or generate high-fidelity offline Parquet caches:
-```bash
-python3 data/export_subgraphs.py --force-synthetic
+python data/export_subgraphs.py --dataset hemibrain:v1.2.1 --output-dir data/live
+# Or explicitly generate unvalidated examples in a separate directory:
+python data/export_subgraphs.py --force-synthetic --output-dir data/synthetic
 ```
 
----
+Live extraction fails on missing credentials, query errors, empty graphs or
+unknown neurotransmitter polarity. It never substitutes synthetic data. Dataset
+coverage, neuron names and neurotransmitter fields must match the chosen server.
+A manifest records source, dataset and file hashes; verify hashes when consuming
+an export. Existing bundled Parquet files have unverified provenance and are not
+biological ground truth. No FlyWire-specific importer is implemented.
 
-## High-Dimensional Connectome Model (24 PNs & 128 KCs)
+## Performance and energy scope
 
-- **24-Channel Sensory Receptor Array (Projection Neurons)**:
-  - $PN_{0..8}$: Obstacle identity & geometry (Hurdle, Arch, Monolith across 3 lanes within 38m).
-  - $PN_{9..11}$: Downstream secondary hazard depth (20m to 55m).
-  - $PN_{12..15}$: Haltere gyroscopic lateral velocity & jumping/sliding mechanoreceptors.
-  - $PN_{16..20}$: Lobula LC4 Looming optical expansion rate & T4/T5 optomotor horizontal flow.
-  - $PN_{21..23}$: Spatial position one-hot (Lane 0, 1, 2).
-- **128 Kenyon Cells & APL Feedback Inhibition**:
-  - Calyx divergence ($K=5$ random PNs per KC) and Anterior Paired Lateral (APL) GABAergic feedback inhibition enforcing ~7% sparse coding (9 / 128 active KCs).
-- **4 Motor Output Neurons (MBONs) & 512 Plastic Synapses**:
-  - $4 \times 128$ synaptic weight matrix with 3-factor STDP modulated by $+0.75$ PAM (clearance) and $-1.4$ PPL1 (collision) dopamine bursts.
+CSR multiplication processes stored graph edges, not just synapses whose source
+neuron fired. LIF integration also visits the population. A simulated 1 ms step
+is not a 1 kHz wall-clock scheduler. Small-kernel CPU medians can be below 1 ms;
+no portable latency guarantee or edge CPU/GPU comparison is established.
 
----
+`EnergyEstimator` sums assumed energy per modeled synaptic event and neuron
+update, then divides by simulated duration. Its output is a hypothetical
+operation-energy model, not measured CPU/GPU power. It omits rendering, memory,
+software overhead, idle power and other operations. The MVP counts LC4→GF events
+only; it does not account for all retinal processing.
 
-## Theoretical Architecture
+## Next validation work
 
-For complete mathematical derivations, LaTeX formulas for LIF/EMD/STDP, latency budget tables, and Drosophila-to-robotics mapping, refer to [ARCHITECTURE.md](ARCHITECTURE.md).
+Compare learning enabled and frozen on multiple held-out obstacle seeds, using
+the same initial weights. Report collision rate, damage per distance, survival
+distance and speed at several frame rates. Measure actual device energy before
+making energy-efficiency claims. Validate circuit selectivity with translation,
+recession, illumination and expansion controls, and document anatomical sources
+before claiming connectome-derived wiring.
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for model equations and implementation boundaries.
