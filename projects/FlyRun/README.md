@@ -9,7 +9,7 @@ Hassenstein–Reichardt motion correlators, and three-factor STDP.
 connectome.** Gameplay does not establish biological fidelity, learning benefits,
 a sub-millisecond end-to-end deadline, or measured low-power operation.
 
-<p align="center"><img src="gameplay.gif" alt="Illustrative FlyRun gameplay from an earlier version" width="800"/></p>
+<p align="center"><img src="gameplay.gif" alt="FlyRun continuous autonomous flight gameplay" width="800"/></p>
 
 ## What runs where
 
