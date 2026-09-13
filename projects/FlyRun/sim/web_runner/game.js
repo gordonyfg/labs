@@ -1066,17 +1066,34 @@ let ws = null;
 let isWsConnected = false;
 
 function initWebSocket() {
+  // If running on HTTPS (e.g. GitHub Pages) or external host, run purely in standalone browser mode
+  if (window.location.protocol === 'https:' || (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1')) {
+    isWsConnected = false;
+    const statusEl = document.getElementById('bridge-status');
+    if (statusEl) {
+      statusEl.innerText = '● STANDALONE AUTOPILOT';
+      statusEl.style.color = '#38bdf8';
+    }
+    return;
+  }
+
   try {
     ws = new WebSocket('ws://localhost:8765');
     ws.onopen = () => {
       isWsConnected = true;
-      document.getElementById('bridge-status').innerText = '● INCIDENT LOGGER CONNECTED';
-      document.getElementById('bridge-status').style.color = '#10b981';
+      const statusEl = document.getElementById('bridge-status');
+      if (statusEl) {
+        statusEl.innerText = '● INCIDENT LOGGER CONNECTED';
+        statusEl.style.color = '#10b981';
+      }
     };
     ws.onclose = () => {
       isWsConnected = false;
-      document.getElementById('bridge-status').innerText = '● LOCAL CONTROLLER';
-      document.getElementById('bridge-status').style.color = '#38bdf8';
+      const statusEl = document.getElementById('bridge-status');
+      if (statusEl) {
+        statusEl.innerText = '● LOCAL CONTROLLER';
+        statusEl.style.color = '#38bdf8';
+      }
       setTimeout(initWebSocket, 4000);
     };
   } catch (e) {

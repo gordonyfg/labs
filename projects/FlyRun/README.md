@@ -11,6 +11,10 @@ a sub-millisecond end-to-end deadline, or measured low-power operation.
 
 <p align="center"><img src="gameplay.gif" alt="FlyRun continuous autonomous flight gameplay" width="800"/></p>
 
+<p align="center">
+  <a href="https://gordonyfg.github.io/labs/"><img src="https://img.shields.io/badge/Play%20Live%20Demo-GitHub%20Pages-10b981?style=for-the-badge&logo=github&logoColor=white" alt="Play Live Demo"/></a>
+</p>
+
 ## What runs where
 
 | Component | Implemented behavior | Limits |
