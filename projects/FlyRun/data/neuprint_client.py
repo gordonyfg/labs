@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 # Acetylcholine (ACh): Fast excitatory cation channel
 # GABA: Ionotropic / metabotropic inhibitory chloride channel
 # Glutamate (Glu): Predominantly inhibitory via GluCl in insect CNS
-NT_POLARITY_MAP: Dict[str, float] = {
+NT_POLARITY_MAP: Dict[str, Optional[float]] = {
     "ACH": 1.0,
     "ACETYLCHOLINE": 1.0,
     "CHOLINERGIC": 1.0,
@@ -29,7 +29,7 @@ NT_POLARITY_MAP: Dict[str, float] = {
     "DOPAMINE": 0.0,     # Neuromodulatory (handled via STDP third factor)
     "OCTOPAMINE": 0.0,    # Neuromodulatory
     "SEROTONIN": 0.0,     # Neuromodulatory
-    "UNKNOWN": 1.0,       # Default excitatory assumption
+    "UNKNOWN": None,      # Unknown polarity must not silently become excitatory
 }
 
 
@@ -79,8 +79,7 @@ class NeuPrintExtractor:
                pre.predictedNt AS neurotransmitter
         ORDER BY synapse_count DESC
         """
-        results, _ = self.client.fetch_custom(cypher)
-        df = pd.DataFrame(results)
+        df = self.client.fetch_custom(cypher)
         return self._annotate_weights(df)
 
     def query_optomotor_circuit(self) -> pd.DataFrame:
@@ -100,8 +99,7 @@ class NeuPrintExtractor:
                pre.predictedNt AS neurotransmitter
         ORDER BY synapse_count DESC
         """
-        results, _ = self.client.fetch_custom(cypher)
-        df = pd.DataFrame(results)
+        df = self.client.fetch_custom(cypher)
         return self._annotate_weights(df)
 
     def query_mushroom_body_circuit(self) -> pd.DataFrame:
@@ -122,8 +120,7 @@ class NeuPrintExtractor:
         ORDER BY synapse_count DESC
         LIMIT 5000
         """
-        results, _ = self.client.fetch_custom(cypher)
-        df = pd.DataFrame(results)
+        df = self.client.fetch_custom(cypher)
         return self._annotate_weights(df)
 
     def _annotate_weights(self, df: pd.DataFrame, unitary_weight: float = 0.01) -> pd.DataFrame:
@@ -132,9 +129,10 @@ class NeuPrintExtractor:
             return df
 
         def get_polarity(nt: Any) -> float:
-            if not isinstance(nt, str):
-                return 1.0
-            return NT_POLARITY_MAP.get(nt.upper().strip(), 1.0)
+            polarity = NT_POLARITY_MAP.get(nt.upper().strip()) if isinstance(nt, str) else None
+            if polarity is None:
+                raise ValueError(f"Unknown neurotransmitter polarity: {nt!r}")
+            return polarity
 
         df["polarity"] = df["neurotransmitter"].apply(get_polarity)
         df["weight_eff"] = df["polarity"] * df["synapse_count"] * unitary_weight

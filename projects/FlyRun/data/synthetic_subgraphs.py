@@ -1,7 +1,6 @@
-"""High-fidelity synthetic Drosophila connectome subgraphs.
+"""Synthetic, Drosophila-inspired example graphs.
 
-Generates ground-truth-matched topologies when offline or lacking NeuPrint credentials.
-Reflects biological synapse distributions, neurotransmitter identities, and spatial receptive fields.
+These hand-chosen topologies and distributions are not measured connectome data.
 """
 
 from __future__ import annotations
@@ -12,9 +11,9 @@ import pandas as pd
 
 
 def generate_synthetic_looming_graph(num_lc4: int = 256, num_lplc2: int = 128) -> pd.DataFrame:
-    """Generate realistic LC4 & LPLC2 -> Giant Fiber (DNp01) synaptic connectivity table.
+    """Generate illustrative LC4 & LPLC2 -> Giant Fiber (DNp01) synaptic connectivity table.
 
-    Empirical biology:
+    Model assumptions (not empirically validated):
     - LC4: ~60-120 synapses per cell converging onto Giant Fiber dendrites.
     - Neurotransmitter: Acetylcholine (ACh, excitatory).
     - Bilateral Giant Fibers: GF_L (DNp01_L) and GF_R (DNp01_R).

@@ -1,0 +1,10 @@
+{
+  "source": "legacy-unverified",
+  "dataset": null,
+  "biologically_validated": false,
+  "note": "Bundled files predate provenance tracking. Do not treat them as measured connectome data. Current circuits do not load these files.",
+  "sha256": {
+    "looming_subgraph.parquet": "7d4a7f2f7655b42e1ce24f3313a6515a783acbc3392e25cf4eb949e0ddfe998d",
+    "optomotor_subgraph.parquet": "f7f3e8e70ec290618530cbc3f5643789ae4a1a46fda1c4179435337cedbaad53"
+  }
+}

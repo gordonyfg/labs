@@ -1,11 +1,15 @@
 /**
- * FlyRun 3D: Drosophila Connectome Temple Runner
- * Real-time 3D endless runner driven by biological SNN reflex circuits.
+ * FlyRun 3D: Drosophila-inspired Temple Runner
+ * Real-time 3D endless runner using game-state heuristics and reward-modulated sparse features.
  */
 
 // ==========================================
 // 1. GLOBAL CONSTANTS & CONFIGURATION
 // ==========================================
+const runOptions = new URLSearchParams(window.location.search);
+const learningEnabled = runOptions.get('learning') !== 'off';
+const isolatedRun = runOptions.has('seed') || runOptions.get('fresh') === '1';
+const obstacleRandom = runOptions.has('seed') ? pseudoRandom(Number(runOptions.get('seed')) || 1) : Math.random;
 const LANES = [-3.2, 0.0, 3.2]; // Left, Center, Right
 const LANE_NAMES = ['LEFT', 'CENTER', 'RIGHT'];
 const CRUISE_SPEED = 24.0; // Nominal cruising velocity (units / sec)
@@ -182,8 +186,8 @@ const obstacles = [];
 const OBSTACLE_TYPES = ['HURDLE', 'ARCH', 'MONOLITH'];
 
 function spawnObstacle(zDistance) {
-  const type = OBSTACLE_TYPES[Math.floor(Math.random() * OBSTACLE_TYPES.length)];
-  const laneIdx = Math.floor(Math.random() * 3);
+  const type = OBSTACLE_TYPES[Math.floor(obstacleRandom() * OBSTACLE_TYPES.length)];
+  const laneIdx = Math.floor(obstacleRandom() * 3);
   const laneX = LANES[laneIdx];
 
   const obsGroup = new THREE.Group();
@@ -306,8 +310,9 @@ for (let k = 0; k < NUM_KC; k++) {
 }
 
 let currentDopamine = 0.0;
-let meanSTDPWeight = 0.35;
-let lastActiveKCCount = 9;
+let meanAssociativeWeight = 0.35;
+let lastActiveKCCount = 0;
+let lastKC = new Float32Array(NUM_KC);
 
 // Plastic Synaptic Weights Matrix W_ak (4 Actions x 128 Kenyon Cells = 512 synapses)
 const kc_weights = Array.from({ length: NUM_ACTIONS }, () => new Float32Array(NUM_KC).fill(0.35));
@@ -315,9 +320,9 @@ const kc_eligibility = Array.from({ length: NUM_ACTIONS }, () => new Float32Arra
 
 function updateMBDopamine(dopamineBurst, reason) {
   currentDopamine = dopamineBurst;
-  const eta = 0.08; // Plasticity learning rate
+  const eta = learningEnabled && flyBrainMode ? 0.08 : 0.0; // Plasticity learning rate
 
-  // 3-Factor STDP Update: delta_W = eta * Dopamine * Eligibility
+  // Reward-modulated associative update (no spike-timing rule): delta_W = eta * Dopamine * Eligibility
   let sumW = 0;
   for (let a = 0; a < NUM_ACTIONS; a++) {
     for (let k = 0; k < NUM_KC; k++) {
@@ -326,7 +331,7 @@ function updateMBDopamine(dopamineBurst, reason) {
       sumW += kc_weights[a][k];
     }
   }
-  meanSTDPWeight = sumW / (NUM_ACTIONS * NUM_KC);
+  meanAssociativeWeight = sumW / (NUM_ACTIONS * NUM_KC);
 
   // Update UI readouts
   const dopValEl = document.getElementById('dopamine-val');
@@ -334,7 +339,7 @@ function updateMBDopamine(dopamineBurst, reason) {
   const stdpEl = document.getElementById('stat-stdp-weight');
 
   if (dopValEl) {
-    dopValEl.innerText = (dopamineBurst > 0 ? '+' : '') + dopamineBurst.toFixed(2) + ' (' + (dopamineBurst > 0 ? 'PAM' : 'PPL1') + ')';
+    dopValEl.innerText = (dopamineBurst > 0 ? '+' : '') + dopamineBurst.toFixed(2) + (dopamineBurst > 0 ? ' (reward)' : ' (penalty)');
     dopValEl.style.color = dopamineBurst > 0 ? '#34d399' : '#ef4444';
   }
   if (dopBarEl) {
@@ -343,7 +348,7 @@ function updateMBDopamine(dopamineBurst, reason) {
     dopBarEl.style.background = dopamineBurst > 0 ? '#34d399' : '#ef4444';
   }
   if (stdpEl) {
-    stdpEl.innerText = 'W = ' + meanSTDPWeight.toFixed(3);
+    stdpEl.innerText = 'W = ' + meanAssociativeWeight.toFixed(3);
   }
 }
 
@@ -370,6 +375,7 @@ let failureStats = {
 let failureHistory = [];
 
 function loadSession() {
+  if (isolatedRun) return;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
@@ -401,14 +407,14 @@ function loadSession() {
             sumW += kc_weights[a][k];
           }
         }
-        meanSTDPWeight = sumW / (NUM_ACTIONS * NUM_KC);
+        meanAssociativeWeight = sumW / (NUM_ACTIONS * NUM_KC);
 
         const epEl = document.getElementById('stat-episode');
         if (epEl) epEl.innerText = trainingEpisode;
         const bestEl = document.getElementById('stat-best');
         if (bestEl) bestEl.innerText = bestDistance + ' m';
         const stdpEl = document.getElementById('stat-stdp-weight');
-        if (stdpEl) stdpEl.innerText = 'W = ' + meanSTDPWeight.toFixed(3);
+        if (stdpEl) stdpEl.innerText = 'W = ' + meanAssociativeWeight.toFixed(3);
       }
     }
   } catch (e) {
@@ -417,6 +423,7 @@ function loadSession() {
 }
 
 function saveSession() {
+  if (isolatedRun) return;
   try {
     const data = {
       episode: trainingEpisode,
@@ -434,7 +441,7 @@ function saveSession() {
 
 function resetSession() {
   try {
-    localStorage.removeItem(STORAGE_KEY);
+    if (!isolatedRun) localStorage.removeItem(STORAGE_KEY);
   } catch (e) {}
 
   trainingEpisode = 0;
@@ -447,7 +454,7 @@ function resetSession() {
     kc_weights[a].fill(0.35);
     kc_eligibility[a].fill(0.0);
   }
-  meanSTDPWeight = 0.35;
+  meanAssociativeWeight = 0.35;
   currentDopamine = 0.0;
 
   const bestEl = document.getElementById('stat-best');
@@ -517,14 +524,14 @@ function drawTelemetryChart() {
     points = [
       { distance: 0, weight: 0.350 },
       ...currentEpisodeMilestones,
-      { distance: Math.max(1, Math.floor(distanceTraveled)), weight: parseFloat(meanSTDPWeight.toFixed(3)), live: true }
+      { distance: Math.max(1, Math.floor(distanceTraveled)), weight: parseFloat(meanAssociativeWeight.toFixed(3)), live: true }
     ];
   } else {
     // Up to last 19 completed + current live run
     const recent = sessionHistory.slice(-19);
     points = [
       ...recent,
-      { distance: Math.max(1, Math.floor(distanceTraveled)), weight: parseFloat(meanSTDPWeight.toFixed(3)), live: true }
+      { distance: Math.max(1, Math.floor(distanceTraveled)), weight: parseFloat(meanAssociativeWeight.toFixed(3)), live: true }
     ];
   }
 
@@ -548,7 +555,7 @@ function drawTelemetryChart() {
   }
   const avgEl = document.getElementById('telemetry-avg-dist');
   if (avgEl) {
-    avgEl.innerText = `Max: ${maxDist}m | W=${meanSTDPWeight.toFixed(3)}`;
+    avgEl.innerText = `Max: ${maxDist}m | W=${meanAssociativeWeight.toFixed(3)}`;
   }
 
   const padLeft = 14;
@@ -1053,7 +1060,7 @@ function updateEyeCanvas(nearestObs, nearestDist) {
 }
 
 // ==========================================
-// 7. WEBSOCKET & BIOLOGICAL SNN AUTOPILOT
+// 7. INCIDENT LOGGER & BROWSER AUTOPILOT
 // ==========================================
 let ws = null;
 let isWsConnected = false;
@@ -1063,18 +1070,12 @@ function initWebSocket() {
     ws = new WebSocket('ws://localhost:8765');
     ws.onopen = () => {
       isWsConnected = true;
-      document.getElementById('bridge-status').innerText = '● PYTHON SNN ONLINE';
+      document.getElementById('bridge-status').innerText = '● INCIDENT LOGGER CONNECTED';
       document.getElementById('bridge-status').style.color = '#10b981';
-    };
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (flyBrainMode && data.action) {
-        handleAction(data.action);
-      }
     };
     ws.onclose = () => {
       isWsConnected = false;
-      document.getElementById('bridge-status').innerText = '● SNN EMBEDDED';
+      document.getElementById('bridge-status').innerText = '● LOCAL CONTROLLER';
       document.getElementById('bridge-status').style.color = '#38bdf8';
       setTimeout(initWebSocket, 4000);
     };
@@ -1171,22 +1172,9 @@ function stepMushroomBodyNetwork(pns) {
   }
 
   // 2. APL (Anterior Paired Lateral) GABAergic Feedback Inhibition
-  // Find excitation threshold for top ~9 KCs (7% sparsity of 128)
-  const sorted = Array.from(rawExcitation).sort((a, b) => b - a);
-  const topThreshold = sorted[8] || 0.0; // 9th highest excitation
-
-  const kc = new Float32Array(NUM_KC);
-  let activeCount = 0;
-  const aplDivisor = 1.0 + 0.08 * aplDrive;
-
-  for (let k = 0; k < NUM_KC; k++) {
-    if (rawExcitation[k] >= topThreshold && rawExcitation[k] > 0.04) {
-      kc[k] = Math.min(1.0, rawExcitation[k] / aplDivisor);
-      activeCount++;
-    } else {
-      kc[k] = 0.0; // Silenced by APL GABAergic feedback
-    }
-  }
+  // Explicit top-k approximation; ties cannot exceed the nine-cell cap.
+  const kc = FlyRunController.sparseCode(rawExcitation, 9, 1.0 + 0.08 * aplDrive);
+  const activeCount = kc.reduce((n, value) => n + (value > 0 ? 1 : 0), 0);
   lastActiveKCCount = activeCount;
 
   // Update HUD sparsity readout
@@ -1214,9 +1202,9 @@ function stepMushroomBodyNetwork(pns) {
 // Cooldown to prevent high-frequency erratic lane switching
 let lastLaneDecisionTime = 0;
 
-// Embedded Biological SNN Solver:
+// Embedded browser controller (heuristic policy + sparse associative readout):
 // Integrates 24 PNs, 128 KCs with APL, 4 MBONs, and Giant Fiber / Optomotor Safety Reflexes
-function stepBiologicalSNN(nearestObsInLane, distZ, nowTime) {
+function stepBrowserController(nearestObsInLane, distZ, nowTime) {
   let action = 'NONE';
   let customImpulse = 0.0;
   let isLooming = false;
@@ -1245,6 +1233,7 @@ function stepBiologicalSNN(nearestObsInLane, distZ, nowTime) {
   const pns = getSensoryProjectionNeurons();
   const { kc, valences } = stepMushroomBodyNetwork(pns);
   lastValences = valences;
+  lastKC = kc;
 
   const canSwitchLanes = (nowTime - lastLaneDecisionTime) > 300 && Math.abs(playerGroup.position.x - targetX) < 0.40;
   const isTurning = Math.abs(playerGroup.position.x - targetX) > 0.25;
@@ -1350,16 +1339,14 @@ function stepBiologicalSNN(nearestObsInLane, distZ, nowTime) {
   // If mid-turn, air-brake and check any impending hazards across all lanes
   if (isTurning) {
     shouldBrake = true;
-    for (const obs of obstacles) {
-      if (obs.userData.cleared) continue;
-      const dz = -obs.position.z;
-      if (dz > 0.0 && dz < 11.0) {
-        if (obs.userData.type === 'ARCH' && !isSliding) {
-          secondaryAction = 'SLIDE';
-        } else if (obs.userData.type === 'HURDLE' && !isJumping) {
-          secondaryAction = 'JUMP';
-        }
-      }
+    const posture = FlyRunController.transitionAction(
+      obstacles, playerGroup.position.x, targetX, isJumping, isSliding);
+    if (posture) {
+      // The imminent swept-path hazard wins over an incompatible posture.
+      if (action === 'JUMP' || action === 'SLIDE') action = posture;
+      secondaryAction = action === posture ? null : posture;
+    } else {
+      secondaryAction = null;
     }
   }
 
@@ -1389,35 +1376,6 @@ function stepBiologicalSNN(nearestObsInLane, distZ, nowTime) {
     }
   }
 
-  // 3. SYNAPTIC ELIGIBILITY TRACE UPDATE (e_ak)
-  for (let a = 0; a < NUM_ACTIONS; a++) {
-    for (let k = 0; k < NUM_KC; k++) {
-      kc_eligibility[a][k] *= 0.88; // Exponential decay
-    }
-  }
-
-  let actIdx = -1;
-  if (action === 'LEFT') actIdx = 0;
-  else if (action === 'RIGHT') actIdx = 1;
-  else if (action === 'JUMP') actIdx = 2;
-  else if (action === 'SLIDE') actIdx = 3;
-
-  if (actIdx !== -1) {
-    for (let k = 0; k < NUM_KC; k++) {
-      kc_eligibility[actIdx][k] += 0.35 * kc[k];
-    }
-  }
-
-  if (secondaryAction === 'JUMP') {
-    for (let k = 0; k < NUM_KC; k++) {
-      kc_eligibility[2][k] += 0.25 * kc[k];
-    }
-  } else if (secondaryAction === 'SLIDE') {
-    for (let k = 0; k < NUM_KC; k++) {
-      kc_eligibility[3][k] += 0.25 * kc[k];
-    }
-  }
-
   // Update UI Indicators
   document.getElementById('ind-lc4').className = isLooming ? 'indicator-dot active-lc4' : 'indicator-dot';
   document.getElementById('ind-gf').className = isGiantFiberFired ? 'indicator-dot active-gf' : 'indicator-dot';
@@ -1429,7 +1387,7 @@ function stepBiologicalSNN(nearestObsInLane, distZ, nowTime) {
 
 // Action Dispatcher
 function handleAction(act, customImpulse, currentDistZ) {
-  if (isGameOver) return;
+  if (isGameOver) return false;
   const nowT = performance.now();
   if (act === 'LEFT' && currentLane > 0) {
     currentLane--;
@@ -1449,7 +1407,12 @@ function handleAction(act, customImpulse, currentDistZ) {
     isSliding = true;
     slideTimer = SLIDE_DURATION;
     lastSlideTime = nowT;
+  } else {
+    return false;
   }
+  // Only actions actually accepted by the dispatcher get credit.
+  if (flyBrainMode && learningEnabled) FlyRunController.tagAction(kc_eligibility, act, lastKC);
+  return true;
 }
 
 // ==========================================
@@ -1469,6 +1432,9 @@ window.addEventListener('keydown', (e) => {
 const modeBtn = document.getElementById('btn-mode');
 modeBtn.addEventListener('click', () => {
   flyBrainMode = !flyBrainMode;
+  document.getElementById('stat-latency').innerText = '—';
+  kc_eligibility.forEach(row => row.fill(0));
+  lastKC.fill(0);
   if (flyBrainMode) {
     modeBtn.classList.add('active');
     modeBtn.innerHTML = '<span>🪰 Fly Brain Mode (Auto-Pilot)</span>';
@@ -1488,6 +1454,10 @@ function resetGame() {
     respawnCountdownTimer = null;
   }
 
+  kc_eligibility.forEach(row => row.fill(0));
+  lastKC.fill(0);
+  lastLaneDecisionTime = 0;
+  currentDopamine = 0;
   trainingEpisode++;
   const epEl = document.getElementById('stat-episode');
   if (epEl) epEl.innerText = trainingEpisode;
@@ -1556,6 +1526,7 @@ function animate() {
   lastTime = now;
 
   if (!isGameOver) {
+    FlyRunController.decayEligibility(kc_eligibility, dt);
     // 0. Dynamic Aerodynamic Velocity (Forward Cruise vs Looming Air-Brake)
     const isGliding = Math.abs(playerGroup.position.x - targetX) > 0.25;
     if (isBraking) {
@@ -1605,7 +1576,7 @@ function animate() {
     if (distanceTraveled >= nextMilestoneDist) {
       currentEpisodeMilestones.push({
         distance: Math.floor(distanceTraveled),
-        weight: parseFloat(meanSTDPWeight.toFixed(3))
+        weight: parseFloat(meanAssociativeWeight.toFixed(3))
       });
       nextMilestoneDist += 250;
       drawTelemetryChart();
@@ -1650,21 +1621,21 @@ function animate() {
         obstaclesCleared++;
         document.getElementById('stat-cleared').innerText = obstaclesCleared;
         // SURVIVAL REWARD: Successful obstacle clearance delivers +0.75 PAM Dopamine!
-        updateMBDopamine(0.75, 'Obstacle Cleared');
+        if (!obs.userData.collided) updateMBDopamine(0.75, 'Obstacle Cleared');
       }
 
       // Despawn and respawn far ahead
       if (obs.position.z > 20.0) {
         scene.remove(obs);
         obstacles.splice(i, 1);
-        spawnObstacle(-160.0 - Math.random() * 20.0);
+        spawnObstacle(-160.0 - obstacleRandom() * 20.0);
       }
     }
 
 
     // Smooth Dopamine Decay towards neutral
     if (Math.abs(currentDopamine) > 0.01) {
-      currentDopamine *= 0.95;
+      currentDopamine *= Math.exp(-dt / 0.325);
       const dopValEl = document.getElementById('dopamine-val');
       const dopBarEl = document.getElementById('dopamine-bar');
       if (dopValEl && dopBarEl) {
@@ -1682,7 +1653,9 @@ function animate() {
     let stepAct = 'NONE';
     let stepImpulse = 0.0;
     if (flyBrainMode) {
-      const stepRes = stepBiologicalSNN(nearestObsInLane, nearestDistInLane, now);
+      const controlStart = performance.now();
+      const stepRes = stepBrowserController(nearestObsInLane, nearestDistInLane, now);
+      document.getElementById('stat-latency').innerText = (performance.now() - controlStart).toFixed(2) + ' ms';
       stepAct = stepRes.action;
       stepImpulse = stepRes.customImpulse;
       if (stepAct !== 'NONE') {
@@ -1754,6 +1727,7 @@ function animate() {
             dmg = 50.0;
           }
 
+          if (collisionOccurred) obs.userData.collided = true;
           if (collisionOccurred && invulnerableTimer <= 0.0) {
             flyHealth = Math.max(0.0, flyHealth - dmg);
             invulnerableTimer = 0.55; // 550ms invulnerability grace period
@@ -1795,7 +1769,7 @@ function animate() {
 function triggerGameOver(obs) {
   if (isGameOver) return;
   isGameOver = true;
-  updateMBDopamine(-2.0, 'Crash Collision');
+  // Collision damage already delivered punishment; do not punish twice.
 
   const nowTime = performance.now();
   const obsType = obs ? (obs.userData ? obs.userData.type : String(obs)) : 'UNKNOWN';
@@ -1869,7 +1843,7 @@ function triggerGameOver(obs) {
     isSliding: isSliding,
     timeSinceJump: parseFloat(((nowTime - lastJumpTime) / 1000).toFixed(3)),
     takeoffDist: parseFloat(lastJumpDistZ.toFixed(2)),
-    weight: parseFloat(meanSTDPWeight.toFixed(3))
+    weight: parseFloat(meanAssociativeWeight.toFixed(3))
   };
   failureHistory.push(crashRecord);
 
@@ -1883,7 +1857,7 @@ function triggerGameOver(obs) {
     episode: trainingEpisode,
     distance: currentDist,
     cleared: obstaclesCleared,
-    weight: parseFloat(meanSTDPWeight.toFixed(3)),
+    weight: parseFloat(meanAssociativeWeight.toFixed(3)),
     crash: { obstacle: obsType, cause: cause }
   });
   saveSession();

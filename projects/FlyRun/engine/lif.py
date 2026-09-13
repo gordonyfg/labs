@@ -99,12 +99,14 @@ class LIFPopulation(nn.Module):
         self,
         i_ext: Optional[torch.Tensor] = None,
         synaptic_input: Optional[torch.Tensor] = None,
+        max_spikes: Optional[int] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Perform a single discrete-time simulation step (1 ms).
 
         Args:
             i_ext: External current vector of shape (num_neurons,).
             synaptic_input: External synaptic current vector of shape (num_neurons,).
+            max_spikes: Optional hard population activity cap (top membrane candidates).
 
         Returns:
             Tuple of (spikes, membrane_potential) at time step t.
@@ -135,6 +137,14 @@ class LIFPopulation(nn.Module):
 
         # 4. Spike generation (only non-refractory neurons can fire)
         spike_mask = (v_cand >= self.v_thresh) & (self.ref_counter == 0)
+        # Optional instantaneous competition, used by the KC sparse-code model.
+        if max_spikes is not None:
+            if not 0 <= max_spikes <= self.num_neurons:
+                raise ValueError("max_spikes must be between zero and population size")
+            scores = torch.where(spike_mask, v_cand, -torch.inf)
+            winners = torch.zeros_like(spike_mask)
+            winners[torch.topk(scores, max_spikes).indices] = True
+            spike_mask &= winners
         self.spikes.copy_(spike_mask.to(self.dtype))
 
         # 5. Membrane reset and trigger refractory counter

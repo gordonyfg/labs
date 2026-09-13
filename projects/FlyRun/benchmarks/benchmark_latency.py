@@ -1,9 +1,13 @@
 """High-throughput latency benchmarking for FlyRun Neuromorphic Engine.
 
-Validates that single-step forward pass latency meets the edge inference deadline (< 1.0 ms).
+Measures isolated kernels; this does not measure end-to-end gameplay latency.
 """
 
 from __future__ import annotations
+import argparse
+import json
+import platform
+from pathlib import Path
 import time
 import numpy as np
 import torch
@@ -39,9 +43,6 @@ def benchmark_snn_sparse_step(
     pop = LIFPopulation(num_neurons=num_neurons, dt_ms=1.0, device=device)
     pop.set_recurrent_weights(w_sparse)
 
-    # Pre-generate sparse spike activity (~5% active spikes per step)
-    spike_rate = 0.05
-
     # Warmup
     for _ in range(100):
         i_ext = torch.randn(num_neurons, device=device) * 0.5
@@ -73,7 +74,7 @@ def benchmark_snn_sparse_step(
     return {
         "device": device_str,
         "num_neurons": num_neurons,
-        "num_synapses": len(rows),
+        "num_synapses": w_sparse._nnz(),
         "steps": num_steps,
         "mean_ms": float(np.mean(arr) / 1000.0),
         "median_ms": float(np.median(arr) / 1000.0),
@@ -81,6 +82,9 @@ def benchmark_snn_sparse_step(
         "p99_ms": float(np.percentile(arr, 99) / 1000.0),
         "min_ms": float(np.min(arr) / 1000.0),
         "max_ms": float(np.max(arr) / 1000.0),
+        "deadline_ms": 1.0,
+        "deadline_misses": int(np.count_nonzero(arr >= 1000.0)),
+        "deadline_miss_rate": float(np.mean(arr >= 1000.0)),
     }
 
 
@@ -120,40 +124,41 @@ def benchmark_looming_circuit(num_steps: int = 5000, device_str: str = "cpu") ->
         "p99_ms": float(np.percentile(arr, 99) / 1000.0),
         "min_ms": float(np.min(arr) / 1000.0),
         "max_ms": float(np.max(arr) / 1000.0),
+        "deadline_ms": 1.0,
+        "deadline_misses": int(np.count_nonzero(arr >= 1000.0)),
+        "deadline_miss_rate": float(np.mean(arr >= 1000.0)),
     }
 
 
 def main():
-    print("=" * 75)
-    print("FlyRun Neuromorphic Engine - Latency Benchmark Suite")
-    print("=" * 75)
-
-    devices = ["cpu"]
-    if torch.cuda.is_available():
-        devices.append("cuda")
-
-    for dev in devices:
-        print(f"\nEvaluating on Device: {dev.upper()}")
-        print("-" * 50)
-        
-        print("1. Benchmarking Looming Perception-to-Reflex Circuit (5,000 steps)...")
-        res_circuit = benchmark_looming_circuit(num_steps=5000, device_str=dev)
-        print(f"   Median: {res_circuit['median_ms']:.4f} ms ({res_circuit['median_ms']*1000:.1f} us)")
-        print(f"   P95:    {res_circuit['p95_ms']:.4f} ms")
-        print(f"   P99:    {res_circuit['p99_ms']:.4f} ms")
-        print(f"   Max:    {res_circuit['max_ms']:.4f} ms")
-        assert res_circuit['median_ms'] < 1.0, f"Failed < 1.0 ms deadline on {dev}!"
-
-        print("\n2. Benchmarking Large SNN Graph (5,000 Neurons, 200,000 Synapses, 5,000 steps)...")
-        res_sparse = benchmark_snn_sparse_step(num_neurons=5000, synapses_per_neuron=40, num_steps=5000, device_str=dev)
-        print(f"   Median: {res_sparse['median_ms']:.4f} ms ({res_sparse['median_ms']*1000:.1f} us)")
-        print(f"   P95:    {res_sparse['p95_ms']:.4f} ms")
-        print(f"   P99:    {res_sparse['p99_ms']:.4f} ms")
-        assert res_sparse['median_ms'] < 1.0, f"Sparse SNN failed < 1.0 ms deadline on {dev}!"
-
-    print("\n" + "=" * 75)
-    print("ALL LATENCY BENCHMARKS PASSED: Sub-millisecond (< 1.0 ms) target satisfied.")
-    print("=" * 75)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--steps", type=int, default=5000)
+    parser.add_argument("--threads", type=int, default=1)
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
+    parser.add_argument("--require-deadline", action="store_true",
+                        help="Exit unsuccessfully if ANY measured step reaches 1 ms")
+    args = parser.parse_args()
+    if args.steps <= 0 or args.threads <= 0:
+        parser.error("steps and threads must be positive")
+    torch.set_num_threads(args.threads)
+    torch.manual_seed(args.seed)
+    results = [benchmark_looming_circuit(args.steps, args.device),
+               benchmark_snn_sparse_step(num_steps=args.steps, device_str=args.device)]
+    print(json.dumps({
+        "scope": "Isolated Python kernels; excludes browser, rendering, transport and actuation",
+        "platform": platform.platform(), "processor": platform.processor(),
+        "cpu_model": next((line.split(":", 1)[1].strip() for line in
+                           Path("/proc/cpuinfo").read_text().splitlines()
+                           if line.startswith("model name")), platform.processor())
+                     if Path("/proc/cpuinfo").exists() else platform.processor(),
+        "torch": torch.__version__, "threads": torch.get_num_threads(),
+        "seed": args.seed,
+        "device_name": torch.cuda.get_device_name() if args.device == "cuda" else platform.machine(),
+        "results": results,
+    }, indent=2))
+    if args.require_deadline and any(r["deadline_misses"] for r in results):
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

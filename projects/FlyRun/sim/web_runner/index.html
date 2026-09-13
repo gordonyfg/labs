@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FlyRun 3D — Drosophila Connectome Temple Runner</title>
+  <title>FlyRun 3D — Drosophila-inspired Temple Runner</title>
   <link rel="stylesheet" href="style.css">
   <!-- Local Three.js (No external CDN dependency) -->
   <script src="three.min.js"></script>
@@ -17,7 +17,7 @@
   <div class="hud-top">
     <div class="game-title">
       <span>🪰 FLYRUN 3D</span>
-      <span class="badge badge-bio">MaleCNS v1.0 SNN</span>
+      <span class="badge badge-bio">Bio-inspired simulation</span>
       <button id="btn-new-session" class="session-btn" title="Reset all learned weights and start a fresh session">
         ↺ New Session
       </button>
@@ -61,11 +61,11 @@
     </div>
   </div>
 
-  <!-- Top Right: Biological Connectome HUD -->
+  <!-- Top Right: Illustrative controller HUD -->
   <div class="hud-brain">
     <div class="brain-header">
-      <span>CONNECTOME SNN (1 kHz)</span>
-      <span id="bridge-status" style="color: #10b981;">● ONLINE</span>
+      <span>BROWSER CONTROLLER</span>
+      <span id="bridge-status" style="color: #10b981;">● LOCAL CONTROLLER</span>
     </div>
     
     <!-- 3D Rotating Drosophila Brain Point Cloud -->
@@ -74,22 +74,22 @@
     <!-- Circuit Indicators -->
     <div class="neural-activity">
       <div class="circuit-indicator">
-        <span>Optomotor (T4/T5 &rarr; HS):</span>
+        <span>Steering rule:</span>
         <span id="ind-opto" class="indicator-dot"></span>
       </div>
       <div class="circuit-indicator">
-        <span>Looming (LC4 &rarr; GF):</span>
+        <span>Approaching obstacle:</span>
         <span id="ind-lc4" class="indicator-dot"></span>
       </div>
       <div class="circuit-indicator">
-        <span>Giant Fiber Takeoff:</span>
+        <span>Escape rule:</span>
         <span id="ind-gf" class="indicator-dot"></span>
       </div>
 
-      <!-- Dopamine 3-Factor STDP Learning Section -->
+      <!-- Reward-modulated associative learning -->
       <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.1);">
         <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 3px;">
-          <span>DAN Dopamine Surge:</span>
+          <span>Reward signal:</span>
           <span id="dopamine-val" style="color: #34d399; font-weight: bold;">0.00</span>
         </div>
         <div style="width: 100%; height: 6px; background: #1e293b; border-radius: 3px; overflow: hidden; position: relative;">
@@ -98,8 +98,8 @@
       </div>
 
       <div class="circuit-indicator" style="margin-top: 4px;">
-        <span>Kenyon Cells (APL ~7%):</span>
-        <span id="stat-kc-sparse" style="color: #38bdf8; font-weight: bold;">9 / 128</span>
+        <span>KC-like features (up to 9):</span>
+        <span id="stat-kc-sparse" style="color: #38bdf8; font-weight: bold;">0 / 128</span>
       </div>
 
       <div class="circuit-indicator" style="margin-top: 3px;">
@@ -108,8 +108,8 @@
       </div>
 
       <div class="circuit-indicator">
-        <span>Inference Latency:</span>
-        <span id="stat-latency" style="color: #38bdf8; font-weight: bold;">0.71 ms</span>
+        <span>Controller compute time:</span>
+        <span id="stat-latency" style="color: #38bdf8; font-weight: bold;">—</span>
       </div>
     </div>
 
@@ -118,18 +118,18 @@
       <canvas id="eye-canvas" width="48" height="48"></canvas>
       <div style="flex: 1; min-width: 0;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span style="font-size: 10px; font-weight: 700; color: #38bdf8; letter-spacing: 0.5px;">COMPOUND EYE</span>
+          <span style="font-size: 10px; font-weight: 700; color: #38bdf8; letter-spacing: 0.5px;">EYE ILLUSTRATION</span>
           <span id="eye-looming-badge" style="font-size: 8px; font-weight: 700; padding: 1px 5px; border-radius: 3px; background: rgba(34, 197, 94, 0.2); color: #4ade80;">CLEAR</span>
         </div>
-        <div style="font-size: 9px; color: #94a3b8; margin-top: 2px;">48&times;48 Ommatidia Array</div>
+        <div style="font-size: 9px; color: #94a3b8; margin-top: 2px;">48&times;48 illustrative view</div>
         <div id="eye-status" style="font-size: 8.5px; color: #64748b; font-family: monospace; margin-top: 2px;">Flow: 24.0 m/s | Loom: 0.00</div>
       </div>
     </div>
 
-    <!-- Live Training Convergence Telemetry Graph -->
+    <!-- Run history telemetry graph -->
     <div class="telemetry-panel">
       <div class="telemetry-header">
-        <span>LEARNING CONVERGENCE</span>
+        <span>RUN HISTORY</span>
         <div class="telemetry-legend">
           <span class="legend-dot" style="background: #38bdf8;"></span>Dist
           <span class="legend-dot" style="background: #c084fc; margin-left: 6px;"></span>W
@@ -180,7 +180,7 @@
         <button id="btn-close-blackbox" style="background: transparent; border: none; color: #94a3b8; font-size: 24px; cursor: pointer; line-height: 1;">&times;</button>
       </div>
       <div id="bb-summary" style="font-size: 13px; color: #cbd5e1; line-height: 1.4; background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 6px;">
-        Continuously recording 5-second circular trajectory of sensory KC inputs, MBON valences, speed, and actions leading to collision incidents.
+        Continuously recording 5-second circular trajectory of sensory inputs, MBON valences, speed, and actions leading to collision incidents.
       </div>
       <div style="overflow-y: auto; max-height: 380px; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; background: #030712;">
         <table id="bb-table" style="width: 100%; border-collapse: collapse; font-family: monospace; font-size: 11px; text-align: left;">
@@ -192,7 +192,7 @@
               <th style="padding: 6px 10px;">Lane</th>
               <th style="padding: 6px 10px;">Action</th>
               <th style="padding: 6px 10px;">Valences (L/S/R)</th>
-              <th style="padding: 6px 10px;">KC Sensors</th>
+              <th style="padding: 6px 10px;">PN Sensors</th>
               <th style="padding: 6px 10px;">Obstacle Ahead</th>
             </tr>
           </thead>
@@ -208,6 +208,7 @@
     </div>
   </div>
 
+  <script src="controller_utils.js"></script>
   <script src="game.js"></script>
 </body>
 </html>
