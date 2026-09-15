@@ -64,12 +64,36 @@
   <!-- Top Right: Illustrative controller HUD -->
   <div class="hud-brain">
     <div class="brain-header">
-      <span>BROWSER CONTROLLER</span>
-      <span id="bridge-status" style="color: #10b981;">● LOCAL CONTROLLER</span>
+      <div style="display: flex; align-items: center; gap: 5px;">
+        <span style="letter-spacing: 0.5px;">NEURAL OBSERVATORY</span>
+        <span class="badge badge-bio" style="font-size: 8px; padding: 1px 4px; margin-left: 2px;">MaleCNS v1.0</span>
+      </div>
+      <span id="bridge-status" style="color: #38bdf8; font-size: 9px; font-weight: bold;">● LOCAL CONTROLLER</span>
     </div>
     
-    <!-- 3D Rotating Drosophila Brain Point Cloud -->
-    <canvas id="brain-canvas"></canvas>
+    <!-- 3D Rotating Drosophila Brain Point Cloud (Dual-State Sparsity) -->
+    <div style="position: relative;">
+      <canvas id="brain-canvas"></canvas>
+      <div id="brain-sub-label" style="position: absolute; bottom: 4px; left: 6px; font-size: 8px; color: #64748b; font-family: monospace; pointer-events: none; background: rgba(0,0,0,0.4); padding: 1px 4px; border-radius: 2px;">
+        2,400 SOMAS · DUAL-STATE SPARSITY
+      </div>
+    </div>
+
+    <!-- Live Electrophysiology Spike Raster Plot (2s binned) -->
+    <div class="raster-panel">
+      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9px; font-weight: 700; color: #94a3b8; margin-bottom: 3px; font-family: monospace;">
+        <span>SPIKE RASTER (2s BINNED)</span>
+        <span id="raster-rate-label" style="color: #34d399; font-weight: bold;">0.0 Hz</span>
+      </div>
+      <canvas id="raster-canvas" width="251" height="52" style="width: 100%; height: 52px; display: block; border-radius: 4px; background: #020617;"></canvas>
+      <div style="display: flex; justify-content: space-between; font-size: 7.5px; color: #64748b; font-family: monospace; margin-top: 2px; padding: 0 2px;">
+        <span style="color: #ef4444;">● LC4</span>
+        <span style="color: #06b6d4;">● T4/T5</span>
+        <span style="color: #c084fc;">● KC-MB</span>
+        <span style="color: #eab308;">● GF</span>
+        <span style="color: #10b981;">● DN-Motor</span>
+      </div>
+    </div>
 
     <!-- Circuit Indicators -->
     <div class="neural-activity">

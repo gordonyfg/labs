@@ -765,65 +765,99 @@ function renderBlackBoxModal(incident) {
 }
 
 // ==========================================
-// 5. 3D CONNECTOME BRAIN HUD INSET
+// 5. 3D CONNECTOME BRAIN HUD (DUAL-STATE SPARSITY)
 // ==========================================
 const brainCanvas = document.getElementById('brain-canvas');
-const bw = brainCanvas.clientWidth || 226;
-const bh = brainCanvas.clientHeight || 140;
+const bw = brainCanvas.clientWidth || 251;
+const bh = brainCanvas.clientHeight || 145;
 
 const brainScene = new THREE.Scene();
-const brainCamera = new THREE.PerspectiveCamera(50, bw / bh, 0.1, 50);
-brainCamera.position.set(0, 0, 8.5);
+const brainCamera = new THREE.PerspectiveCamera(46, bw / bh, 0.1, 50);
+brainCamera.position.set(0, 0.2, 8.6);
 
 let brainRenderer = null;
 try {
   brainRenderer = new THREE.WebGLRenderer({ canvas: brainCanvas, alpha: true, antialias: true });
   brainRenderer.setSize(bw, bh);
+  brainRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 } catch (e) {
   console.warn("Second WebGL context for brain HUD not supported; skipping brain canvas:", e);
 }
 
-// Generate Fruit Fly Brain Point Cloud (Optic lobes + Central brain ~1200 particles)
-const brainParticleCount = 1200;
+// 2,400 Anatomical Drosophila Brain Somas (MaleCNS / FlyWire atlas layout)
+// 0..699: Left Optic Lobe (Medulla, Lobula, Lamina)
+// 700..1399: Right Optic Lobe (Medulla, Lobula, Lamina)
+// 1400..1749: Central Complex (Ellipsoid Body torus, Fan-shaped body)
+// 1750..2099: Mushroom Body & Kenyon Cells (Paired dorsal lobes and calyces, 128 clusters)
+// 2100..2399: Ventral Nerve Cord (VNC) & Descending Motor Neurons
+const brainParticleCount = 2400;
 const brainPositions = new Float32Array(brainParticleCount * 3);
+const brainBaseColors = new Float32Array(brainParticleCount * 3);
 const brainColors = new Float32Array(brainParticleCount * 3);
+const brainActivity = new Float32Array(brainParticleCount); // Dynamic activation 0.0 -> 1.0
 
 for (let i = 0; i < brainParticleCount; i++) {
-  // Model bilobed drosophila morphology
-  const isLeftEye = i < 450;
-  const isRightEye = i >= 450 && i < 900;
-  const isCentral = i >= 900;
+  let x = 0, y = 0, z = 0;
+  let r = 0.04, g = 0.32, b = 0.48; // Default dim quiescent color
 
-  let x, y, z;
-  if (isLeftEye) {
-    // Left optic lobe
-    x = -2.2 + (Math.random() - 0.5) * 1.5;
-    y = (Math.random() - 0.5) * 2.2;
-    z = (Math.random() - 0.5) * 1.6;
-    brainColors[i * 3 + 0] = 0.2;
-    brainColors[i * 3 + 1] = 0.7;
-    brainColors[i * 3 + 2] = 0.9;
-  } else if (isRightEye) {
-    // Right optic lobe
-    x = 2.2 + (Math.random() - 0.5) * 1.5;
-    y = (Math.random() - 0.5) * 2.2;
-    z = (Math.random() - 0.5) * 1.6;
-    brainColors[i * 3 + 0] = 0.2;
-    brainColors[i * 3 + 1] = 0.7;
-    brainColors[i * 3 + 2] = 0.9;
+  if (i < 700) {
+    // Left Optic Lobe: curved crescent shell
+    const u = Math.random();
+    const theta = (Math.random() - 0.5) * Math.PI * 0.9;
+    const phi = (Math.random() - 0.5) * Math.PI * 0.85;
+    const rad = 1.6 + u * 0.5;
+    x = -2.4 - Math.cos(theta) * Math.cos(phi) * 0.7 + (Math.random() - 0.5) * 0.35;
+    y = Math.sin(theta) * rad * 0.7 + 0.1 + (Math.random() - 0.5) * 0.25;
+    z = Math.sin(phi) * rad * 0.6 + (Math.random() - 0.5) * 0.25;
+    r = 0.04; g = 0.32; b = 0.48; // Dim deep cyan
+  } else if (i < 1400) {
+    // Right Optic Lobe: symmetric curved crescent shell
+    const u = Math.random();
+    const theta = (Math.random() - 0.5) * Math.PI * 0.9;
+    const phi = (Math.random() - 0.5) * Math.PI * 0.85;
+    const rad = 1.6 + u * 0.5;
+    x = 2.4 + Math.cos(theta) * Math.cos(phi) * 0.7 + (Math.random() - 0.5) * 0.35;
+    y = Math.sin(theta) * rad * 0.7 + 0.1 + (Math.random() - 0.5) * 0.25;
+    z = Math.sin(phi) * rad * 0.6 + (Math.random() - 0.5) * 0.25;
+    r = 0.04; g = 0.32; b = 0.48;
+  } else if (i < 1750) {
+    // Central Complex: Torus (Ellipsoid body) & Fan-shaped body in center
+    const angle = Math.random() * Math.PI * 2;
+    const ringRad = 0.45 + (Math.random() - 0.5) * 0.25;
+    x = Math.cos(angle) * ringRad + (Math.random() - 0.5) * 0.15;
+    y = Math.sin(angle) * ringRad * 0.55 + 0.1 + (Math.random() - 0.5) * 0.2;
+    z = (Math.random() - 0.5) * 0.55;
+    r = 0.08; g = 0.42; b = 0.42; // Dim teal
+  } else if (i < 2100) {
+    // Mushroom Body (128 Kenyon Cell Clusters): Paired dorsal columns & calyces
+    const kcIdx = (i - 1750) % 128;
+    const isLeft = (kcIdx % 2 === 0);
+    const sideSign = isLeft ? -1 : 1;
+    const frac = Math.random();
+    x = sideSign * (0.65 + frac * 0.55) + (Math.random() - 0.5) * 0.2;
+    y = 0.4 + frac * 1.25 + (Math.random() - 0.5) * 0.2;
+    z = -0.15 + (Math.random() - 0.5) * 0.6;
+    r = 0.18; g = 0.12; b = 0.42; // Dim indigo/purple
   } else {
-    // Central complex / Mushroom Body
-    x = (Math.random() - 0.5) * 1.8;
-    y = -0.4 + (Math.random() - 0.5) * 2.0;
-    z = (Math.random() - 0.5) * 1.8;
-    brainColors[i * 3 + 0] = 0.6;
-    brainColors[i * 3 + 1] = 0.3;
-    brainColors[i * 3 + 2] = 0.9;
+    // Ventral Nerve Cord (VNC) & Descending Neurons (DNs)
+    const distDown = Math.random();
+    x = (Math.random() - 0.5) * (0.7 - distDown * 0.35);
+    y = -0.45 - distDown * 1.55;
+    z = (Math.random() - 0.5) * 0.45;
+    r = 0.06; g = 0.30; b = 0.22; // Dim forest green
   }
 
   brainPositions[i * 3 + 0] = x;
   brainPositions[i * 3 + 1] = y;
   brainPositions[i * 3 + 2] = z;
+
+  brainBaseColors[i * 3 + 0] = r;
+  brainBaseColors[i * 3 + 1] = g;
+  brainBaseColors[i * 3 + 2] = b;
+
+  brainColors[i * 3 + 0] = r;
+  brainColors[i * 3 + 1] = g;
+  brainColors[i * 3 + 2] = b;
 }
 
 const brainGeo = new THREE.BufferGeometry();
@@ -831,7 +865,7 @@ brainGeo.setAttribute('position', new THREE.BufferAttribute(brainPositions, 3));
 brainGeo.setAttribute('color', new THREE.BufferAttribute(brainColors, 3));
 
 const brainMat = new THREE.PointsMaterial({
-  size: 0.16,
+  size: 0.13,
   vertexColors: true,
   transparent: true,
   opacity: 0.85,
@@ -840,12 +874,99 @@ const brainMat = new THREE.PointsMaterial({
 const brainCloud = new THREE.Points(brainGeo, brainMat);
 brainScene.add(brainCloud);
 
-// Giant Fiber marker (Gold central pulses)
-const gfPulseGeo = new THREE.SphereGeometry(0.35, 12, 12);
-const gfPulseMat = new THREE.MeshBasicMaterial({ color: 0xeab308, wireframe: true });
+// Giant Fiber central escape node
+const gfPulseGeo = new THREE.SphereGeometry(0.32, 12, 12);
+const gfPulseMat = new THREE.MeshBasicMaterial({ color: 0xeab308, wireframe: true, transparent: true, opacity: 0.45 });
 const gfPulse = new THREE.Mesh(gfPulseGeo, gfPulseMat);
-gfPulse.position.set(0, -0.5, 0);
+gfPulse.position.set(0, -0.4, 0);
 brainScene.add(gfPulse);
+
+// Mouse interactive rotation for brain HUD
+let brainMouseX = 0;
+let brainMouseY = 0;
+if (brainCanvas) {
+  brainCanvas.addEventListener('mousemove', (e) => {
+    const rect = brainCanvas.getBoundingClientRect();
+    brainMouseX = ((e.clientX - rect.left) / rect.width - 0.5) * 2.0;
+    brainMouseY = ((e.clientY - rect.top) / rect.height - 0.5) * 2.0;
+  });
+  brainCanvas.addEventListener('mouseleave', () => {
+    brainMouseX = 0;
+    brainMouseY = 0;
+  });
+}
+
+// ==========================================
+// 5B. LIVE SPIKE RASTER PLOT (2-SECOND BINNED)
+// ==========================================
+const rasterCanvas = document.getElementById('raster-canvas');
+const rasterCtx = rasterCanvas ? rasterCanvas.getContext('2d') : null;
+const RASTER_DURATION = 2000; // 2 seconds
+const rasterSpikes = []; // Array of { time, channel, color }
+let lastRasterUpdate = 0;
+let lastControllerState = {
+  isLooming: false,
+  isGiantFiberFired: false,
+  isOptomotorFired: false,
+  pns: new Float32Array(NUM_PN),
+  action: 'NONE'
+};
+
+function updateSpikeRaster(now) {
+  if (!rasterCtx) return;
+  const rw = rasterCanvas.width;
+  const rh = rasterCanvas.height;
+
+  // Prune spikes older than 2000ms
+  while (rasterSpikes.length && now - rasterSpikes[0].time > RASTER_DURATION) {
+    rasterSpikes.shift();
+  }
+
+  // Update Hz readout every 250ms
+  if (now - lastRasterUpdate > 250) {
+    const hz = (rasterSpikes.length / (RASTER_DURATION / 1000)).toFixed(1);
+    const rateEl = document.getElementById('raster-rate-label');
+    if (rateEl) rateEl.innerText = `${hz} Hz`;
+    lastRasterUpdate = now;
+  }
+
+  // Clear background
+  rasterCtx.fillStyle = '#020617';
+  rasterCtx.fillRect(0, 0, rw, rh);
+
+  // Draw channel divider lines
+  const chH = rh / 5;
+  rasterCtx.strokeStyle = 'rgba(56, 189, 248, 0.08)';
+  rasterCtx.lineWidth = 1;
+  for (let c = 1; c < 5; c++) {
+    const y = Math.floor(c * chH);
+    rasterCtx.beginPath();
+    rasterCtx.moveTo(0, y);
+    rasterCtx.lineTo(rw, y);
+    rasterCtx.stroke();
+  }
+
+  // Draw vertical scrolling time grid markers (every 500ms)
+  const offset = ((now % 500) / 500);
+  rasterCtx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+  for (let x = (1 - offset) * (rw / 4); x < rw; x += rw / 4) {
+    rasterCtx.beginPath();
+    rasterCtx.moveTo(x, 0);
+    rasterCtx.lineTo(x, rh);
+    rasterCtx.stroke();
+  }
+
+  // Draw action-potential spike ticks
+  for (let i = 0; i < rasterSpikes.length; i++) {
+    const sp = rasterSpikes[i];
+    const age = now - sp.time;
+    const x = rw * (1.0 - age / RASTER_DURATION);
+    const y = sp.channel * chH + 2;
+    const h = chH - 4;
+    rasterCtx.fillStyle = sp.color;
+    rasterCtx.fillRect(Math.floor(x), y, 2, Math.max(2, h));
+  }
+}
 
 // ==========================================
 // 6. COMPOUND EYE 48x48 CANVAS RENDERER
@@ -1398,6 +1519,14 @@ function stepBrowserController(nearestObsInLane, distZ, nowTime) {
   document.getElementById('ind-gf').className = isGiantFiberFired ? 'indicator-dot active-gf' : 'indicator-dot';
   document.getElementById('ind-opto').className = isOptomotorFired ? 'indicator-dot active-optomotor' : 'indicator-dot';
 
+  if (typeof lastControllerState !== 'undefined') {
+    lastControllerState.isLooming = isLooming;
+    lastControllerState.isGiantFiberFired = isGiantFiberFired;
+    lastControllerState.isOptomotorFired = isOptomotorFired;
+    lastControllerState.pns = pns;
+    lastControllerState.action = action;
+  }
+
   lastActionTaken = action;
   return { action, customImpulse, secondaryAction };
 }
@@ -1771,13 +1900,128 @@ function animate() {
     }
   }
 
-  // Rotate 3D Drosophila Brain Point Cloud HUD
-  brainCloud.rotation.y += 0.015;
-  brainCloud.rotation.x = Math.sin(now * 0.001) * 0.15;
-  gfPulse.scale.setScalar(1.0 + Math.sin(now * 0.008) * 0.15);
+  // Dynamic Calcium Activation & Sparse Firing Update for 3D Drosophila Brain
+  const pns = lastControllerState.pns;
+  const leftOpticDrive = Math.max(pns[16] || 0, pns[19] || 0, (pns[0] || 0) * 0.8);
+  const rightOpticDrive = Math.max(pns[18] || 0, pns[20] || 0, (pns[2] || 0) * 0.8);
+
+  // 1. Excite Optic Lobes based on visual looming / flow
+  if (leftOpticDrive > 0.08) {
+    const burstCount = Math.floor(leftOpticDrive * 16);
+    for (let k = 0; k < burstCount; k++) {
+      const idx = Math.floor(Math.random() * 700);
+      brainActivity[idx] = Math.max(brainActivity[idx], leftOpticDrive);
+    }
+    if (Math.random() < leftOpticDrive * 0.8) {
+      rasterSpikes.push({ time: now, channel: 0, color: '#ef4444' }); // LC4 Looming
+    }
+  }
+  if (rightOpticDrive > 0.08) {
+    const burstCount = Math.floor(rightOpticDrive * 16);
+    for (let k = 0; k < burstCount; k++) {
+      const idx = 700 + Math.floor(Math.random() * 700);
+      brainActivity[idx] = Math.max(brainActivity[idx], rightOpticDrive);
+    }
+    if (Math.random() < rightOpticDrive * 0.8) {
+      rasterSpikes.push({ time: now, channel: 0, color: '#ef4444' }); // LC4 Looming
+    }
+  }
+  if (lastControllerState.isOptomotorFired && Math.random() < 0.7) {
+    rasterSpikes.push({ time: now, channel: 1, color: '#06b6d4' }); // T4/T5 Optomotor
+  }
+
+  // 2. Central Complex (Ellipsoid body torus & fan-shaped body)
+  const ccSpeedFactor = Math.min(1.0, forwardSpeed / 35.0);
+  const ccActiveCount = 6 + Math.floor(ccSpeedFactor * 18);
+  for (let k = 0; k < ccActiveCount; k++) {
+    const idx = 1400 + Math.floor(Math.random() * 350);
+    brainActivity[idx] = Math.max(brainActivity[idx], 0.4 + ccSpeedFactor * 0.5);
+  }
+
+  // 3. Mushroom Body & Sparse Kenyon Cells: Only the ~9 active units ignite!
+  if (lastActiveKCCount > 0) {
+    for (let k = 0; k < NUM_KC; k++) {
+      const val = lastKC[k];
+      if (val > 0.04) {
+        // Excite the somas belonging to this specific KC
+        for (let som = 0; som < 3; som++) {
+          const idx = 1750 + ((k * 3 + som) % 350);
+          brainActivity[idx] = Math.max(brainActivity[idx], Math.min(1.0, val * 1.2));
+        }
+      }
+    }
+    if (Math.random() < (lastActiveKCCount / 9.0) * 0.85) {
+      rasterSpikes.push({ time: now, channel: 2, color: '#c084fc' }); // KC-MB
+    }
+  }
+
+  // 4. Giant Fiber & Descending Motor Neurons
+  if (isJumping || isSliding || lastControllerState.isGiantFiberFired) {
+    for (let k = 0; k < 25; k++) {
+      const idx = 2100 + Math.floor(Math.random() * 300);
+      brainActivity[idx] = 1.0;
+    }
+    if (Math.random() < 0.55) {
+      rasterSpikes.push({ time: now, channel: 3, color: '#eab308' }); // GF Escape
+    }
+  }
+  if (Math.abs(playerGroup.position.x - targetX) > 0.12) {
+    for (let k = 0; k < 14; k++) {
+      const idx = 2100 + Math.floor(Math.random() * 300);
+      brainActivity[idx] = Math.max(brainActivity[idx], 0.85);
+    }
+    if (Math.random() < 0.65) {
+      rasterSpikes.push({ time: now, channel: 4, color: '#10b981' }); // DN Motor
+    }
+  }
+
+  // 5. Exponential Calcium Fluorescence Decay & Dual-State Color Shading
+  const decay = Math.exp(-dt / 0.18); // ~180ms half-life
+  const hasRewardBurst = Math.abs(currentDopamine) > 0.1;
+  for (let i = 0; i < brainParticleCount; i++) {
+    brainActivity[i] *= decay;
+    const act = brainActivity[i];
+    const br = brainBaseColors[i * 3 + 0];
+    const bg = brainBaseColors[i * 3 + 1];
+    const bb = brainBaseColors[i * 3 + 2];
+
+    if (act < 0.03) {
+      brainColors[i * 3 + 0] = br;
+      brainColors[i * 3 + 1] = bg;
+      brainColors[i * 3 + 2] = bb;
+    } else {
+      if (hasRewardBurst && i >= 1400 && i < 2100) {
+        // Neuromodulatory flash in Central Complex / Mushroom Body
+        if (currentDopamine > 0) {
+          brainColors[i * 3 + 0] = THREE.MathUtils.lerp(br, 0.2, act);
+          brainColors[i * 3 + 1] = THREE.MathUtils.lerp(bg, 1.0, act);
+          brainColors[i * 3 + 2] = THREE.MathUtils.lerp(bb, 0.5, act);
+        } else {
+          brainColors[i * 3 + 0] = THREE.MathUtils.lerp(br, 1.0, act);
+          brainColors[i * 3 + 1] = THREE.MathUtils.lerp(bg, 0.2, act);
+          brainColors[i * 3 + 2] = THREE.MathUtils.lerp(bb, 0.2, act);
+        }
+      } else {
+        // High-intensity fiery amber/gold sparks with bloom
+        brainColors[i * 3 + 0] = THREE.MathUtils.lerp(br, 1.0, act);
+        brainColors[i * 3 + 1] = THREE.MathUtils.lerp(bg, 0.80, act);
+        brainColors[i * 3 + 2] = THREE.MathUtils.lerp(bb, 0.22, act);
+      }
+    }
+  }
+  brainGeo.attributes.color.needsUpdate = true;
+
+  // Rotate & Tilt 3D Drosophila Brain Point Cloud HUD
+  brainCloud.rotation.y += 0.012 + brainMouseX * 0.02;
+  brainCloud.rotation.x = Math.sin(now * 0.001) * 0.12 - brainMouseY * 0.2;
+  gfPulse.scale.setScalar(1.0 + (isJumping || isSliding ? 0.45 : 0.0) + Math.sin(now * 0.008) * 0.15);
+
   if (brainRenderer) {
     brainRenderer.render(brainScene, brainCamera);
   }
+
+  // Update Live Spike Raster
+  updateSpikeRaster(now);
 
   // Render Main 3D Temple Runner
   renderer.render(scene, camera);
