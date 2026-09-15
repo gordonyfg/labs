@@ -133,51 +133,254 @@ segments.forEach(s => trackGroup.add(s));
 // ==========================================
 // 3. 3D FLY RUNNER CHARACTER
 // ==========================================
+// 3. 3D ANATOMICAL DROSOPHILA CHARACTER
+// ==========================================
 const playerGroup = new THREE.Group();
 playerGroup.position.set(0, 0.8, 0);
 scene.add(playerGroup);
 
-// Low-poly Fly Body
-const thoraxGeo = new THREE.SphereGeometry(0.55, 12, 10);
-const flyMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4, metalness: 0.6 });
-const thorax = new THREE.Mesh(thoraxGeo, flyMat);
-thorax.scale.set(0.9, 0.9, 1.3);
-thorax.castShadow = true;
-playerGroup.add(thorax);
+// Master body sub-group for banking and pitch animations
+const flyBody = new THREE.Group();
+playerGroup.add(flyBody);
 
-// Compound Eyes (Red/Orange multi-faceted)
-const eyeGeo = new THREE.SphereGeometry(0.3, 10, 10);
-const eyeMat = new THREE.MeshStandardMaterial({
+// Materials for Drosophila Anatomy
+const chitinAmberMat = new THREE.MeshStandardMaterial({
   color: 0xd97706,
-  emissive: 0x78350f,
-  roughness: 0.2,
-  metalness: 0.8,
+  roughness: 0.35,
+  metalness: 0.35
 });
-const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
-leftEye.position.set(-0.35, 0.22, -0.45);
-playerGroup.add(leftEye);
-
-const rightEye = leftEye.clone();
-rightEye.position.set(0.35, 0.22, -0.45);
-playerGroup.add(rightEye);
-
-// Transparent Translucent Wings
-const wingGeo = new THREE.BoxGeometry(0.9, 0.02, 1.4);
-const wingMat = new THREE.MeshStandardMaterial({
-  color: 0x38bdf8,
+const chitinDarkMat = new THREE.MeshStandardMaterial({
+  color: 0x18181b,
+  roughness: 0.45,
+  metalness: 0.4
+});
+const thoraxShieldMat = new THREE.MeshStandardMaterial({
+  color: 0x9a3412,
+  roughness: 0.3,
+  metalness: 0.45
+});
+const rubyEyeMat = new THREE.MeshStandardMaterial({
+  color: 0x991b1b,
+  emissive: 0x500724,
+  roughness: 0.15,
+  metalness: 0.75
+});
+const eyeFacetMat = new THREE.MeshBasicMaterial({
+  color: 0xfecaca,
+  wireframe: true,
   transparent: true,
-  opacity: 0.55,
-  roughness: 0.1,
+  opacity: 0.22
 });
-const leftWing = new THREE.Mesh(wingGeo, wingMat);
-leftWing.position.set(-0.6, 0.45, 0.2);
-leftWing.rotation.z = Math.PI * 0.08;
-playerGroup.add(leftWing);
+const wingBladeMat = new THREE.MeshStandardMaterial({
+  color: 0xf0f9ff,
+  transparent: true,
+  opacity: 0.48,
+  roughness: 0.1,
+  metalness: 0.3,
+  side: THREE.DoubleSide
+});
+const veinMat = new THREE.LineBasicMaterial({
+  color: 0x334155,
+  linewidth: 1.5,
+  transparent: true,
+  opacity: 0.7
+});
+const haltereMat = new THREE.MeshStandardMaterial({
+  color: 0xfef08a,
+  emissive: 0xca8a04,
+  roughness: 0.3
+});
+const legMat = new THREE.MeshStandardMaterial({
+  color: 0x78350f,
+  roughness: 0.5,
+  metalness: 0.2
+});
 
-const rightWing = new THREE.Mesh(wingGeo, wingMat);
-rightWing.position.set(0.6, 0.45, 0.2);
-rightWing.rotation.z = -Math.PI * 0.08;
-playerGroup.add(rightWing);
+// --- A. THORAX (Mesothorax / Scutum) ---
+const thoraxGeo = new THREE.SphereGeometry(0.52, 16, 14);
+const thorax = new THREE.Mesh(thoraxGeo, chitinAmberMat);
+thorax.scale.set(0.85, 0.95, 1.15);
+thorax.position.set(0, 0, 0);
+thorax.castShadow = true;
+flyBody.add(thorax);
+
+// Dorsal thoracic shield (Dark scutum cap)
+const scutumGeo = new THREE.SphereGeometry(0.48, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.45);
+const scutum = new THREE.Mesh(scutumGeo, thoraxShieldMat);
+scutum.scale.set(0.82, 0.92, 1.1);
+scutum.position.set(0, 0.05, 0);
+flyBody.add(scutum);
+
+// --- B. HEAD & COMPOUND EYES ---
+const headGroup = new THREE.Group();
+headGroup.position.set(0, 0.08, -0.62);
+flyBody.add(headGroup);
+
+const headCapsule = new THREE.Mesh(new THREE.SphereGeometry(0.32, 14, 12), chitinDarkMat);
+headCapsule.scale.set(1.05, 0.9, 0.85);
+headGroup.add(headCapsule);
+
+// Left Compound Eye (Bulging ruby hemisphere with ommatidia facets)
+const leftEyeGroup = new THREE.Group();
+leftEyeGroup.position.set(-0.28, 0.06, -0.08);
+const eyeBaseGeo = new THREE.SphereGeometry(0.24, 14, 14);
+const eyeBaseL = new THREE.Mesh(eyeBaseGeo, rubyEyeMat);
+eyeBaseL.scale.set(0.9, 1.05, 1.15);
+const eyeFacetL = new THREE.Mesh(eyeBaseGeo, eyeFacetMat);
+eyeFacetL.scale.set(0.91, 1.06, 1.16);
+leftEyeGroup.add(eyeBaseL);
+leftEyeGroup.add(eyeFacetL);
+headGroup.add(leftEyeGroup);
+
+// Right Compound Eye
+const rightEyeGroup = leftEyeGroup.clone();
+rightEyeGroup.position.set(0.28, 0.06, -0.08);
+headGroup.add(rightEyeGroup);
+
+// Antennae & Feathery Aristae
+const antGeo = new THREE.CylinderGeometry(0.012, 0.02, 0.18, 6);
+const antL = new THREE.Mesh(antGeo, chitinDarkMat);
+antL.position.set(-0.08, 0.12, -0.28);
+antL.rotation.x = -Math.PI * 0.3;
+antL.rotation.z = Math.PI * 0.15;
+headGroup.add(antL);
+
+const antR = new THREE.Mesh(antGeo, chitinDarkMat);
+antR.position.set(0.08, 0.12, -0.28);
+antR.rotation.x = -Math.PI * 0.3;
+antR.rotation.z = -Math.PI * 0.15;
+headGroup.add(antR);
+
+// --- C. SEGMENTED STRIPED ABDOMEN ---
+// Authentic Drosophila melanogaster 5-tier alternating striped abdomen
+const abdomenGroup = new THREE.Group();
+abdomenGroup.position.set(0, -0.05, 0.5);
+abdomenGroup.rotation.x = Math.PI * 0.06; // Natural downward droop in flight
+flyBody.add(abdomenGroup);
+
+const abdSegments = [
+  { z: 0.12, radX: 0.44, radY: 0.40, radZ: 0.22, mat: chitinAmberMat }, // Tergite T1 (Amber)
+  { z: 0.32, radX: 0.42, radY: 0.38, radZ: 0.22, mat: chitinDarkMat },  // Tergite T2 (Dark stripe)
+  { z: 0.52, radX: 0.38, radY: 0.35, radZ: 0.22, mat: chitinAmberMat }, // Tergite T3 (Amber)
+  { z: 0.72, radX: 0.32, radY: 0.30, radZ: 0.20, mat: chitinDarkMat },  // Tergite T4 (Dark stripe)
+  { z: 0.90, radX: 0.22, radY: 0.20, radZ: 0.20, mat: chitinDarkMat },  // Posterior tip
+];
+
+abdSegments.forEach(seg => {
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(1.0, 14, 10), seg.mat);
+  mesh.scale.set(seg.radX, seg.radY, seg.radZ);
+  mesh.position.set(0, -seg.z * 0.12, seg.z);
+  mesh.castShadow = true;
+  abdomenGroup.add(mesh);
+});
+
+// --- D. AERODYNAMIC VEINED WINGS ---
+// Construct curved wing shape
+const wingShape = new THREE.Shape();
+wingShape.moveTo(0, 0); // Root hinge
+wingShape.bezierCurveTo(0.1, 0.2, 0.2, 1.2, -0.1, 1.95); // Anterior leading edge
+wingShape.bezierCurveTo(-0.3, 2.3, -0.7, 2.35, -0.9, 2.1); // Rounded wing tip
+wingShape.bezierCurveTo(-1.1, 1.6, -1.0, 0.8, -0.3, 0.15); // Posterior trailing edge
+wingShape.closePath();
+
+const wingBladeGeo = new THREE.ShapeGeometry(wingShape);
+
+// Drosophila Wing Venation Lines
+const veinPositions = new Float32Array([
+  // Costa (Leading edge)
+  0, 0, 0.005,  -0.1, 1.95, 0.005,
+  -0.1, 1.95, 0.005,  -0.9, 2.1, 0.005,
+  // Longitudinal Vein L2
+  0, 0, 0.005,  -0.4, 1.85, 0.005,
+  // Longitudinal Vein L3
+  0, 0, 0.005,  -0.65, 1.65, 0.005,
+  // Longitudinal Vein L4
+  0, 0, 0.005,  -0.85, 1.2, 0.005,
+  // Posterior Crossvein
+  -0.4, 1.2, 0.005,  -0.75, 1.05, 0.005,
+]);
+const veinGeo = new THREE.BufferGeometry();
+veinGeo.setAttribute('position', new THREE.BufferAttribute(veinPositions, 3));
+
+// Left Wing Assembly
+const leftWing = new THREE.Group();
+leftWing.position.set(-0.25, 0.35, -0.05);
+const leftBlade = new THREE.Mesh(wingBladeGeo, wingBladeMat);
+leftBlade.rotation.x = Math.PI * 0.48;
+leftBlade.rotation.y = -Math.PI * 0.15;
+const leftVeins = new THREE.LineSegments(veinGeo, veinMat);
+leftVeins.rotation.x = Math.PI * 0.48;
+leftVeins.rotation.y = -Math.PI * 0.15;
+leftWing.add(leftBlade);
+leftWing.add(leftVeins);
+flyBody.add(leftWing);
+
+// Right Wing Assembly (Mirrored)
+const rightWing = new THREE.Group();
+rightWing.position.set(0.25, 0.35, -0.05);
+const rightBlade = new THREE.Mesh(wingBladeGeo, wingBladeMat);
+rightBlade.scale.set(-1, 1, 1); // Mirror across X
+rightBlade.rotation.x = Math.PI * 0.48;
+rightBlade.rotation.y = Math.PI * 0.15;
+const rightVeins = new THREE.LineSegments(veinGeo, veinMat);
+rightVeins.scale.set(-1, 1, 1);
+rightVeins.rotation.x = Math.PI * 0.48;
+rightVeins.rotation.y = Math.PI * 0.15;
+rightWing.add(rightBlade);
+rightWing.add(rightVeins);
+flyBody.add(rightWing);
+
+// --- E. HALTERES (Biological Gyroscopes) ---
+const leftHaltere = new THREE.Group();
+leftHaltere.position.set(-0.32, 0.08, 0.28);
+const haltereStalkGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.22, 6);
+const haltereKnobGeo = new THREE.SphereGeometry(0.055, 8, 8);
+const hStalkL = new THREE.Mesh(haltereStalkGeo, chitinAmberMat);
+hStalkL.rotation.z = Math.PI * 0.4;
+const hKnobL = new THREE.Mesh(haltereKnobGeo, haltereMat);
+hKnobL.position.set(-0.11, 0.04, 0);
+leftHaltere.add(hStalkL);
+leftHaltere.add(hKnobL);
+flyBody.add(leftHaltere);
+
+const rightHaltere = new THREE.Group();
+rightHaltere.position.set(0.32, 0.08, 0.28);
+const hStalkR = new THREE.Mesh(haltereStalkGeo, chitinAmberMat);
+hStalkR.rotation.z = -Math.PI * 0.4;
+const hKnobR = new THREE.Mesh(haltereKnobGeo, haltereMat);
+hKnobR.position.set(0.11, 0.04, 0);
+rightHaltere.add(hStalkR);
+rightHaltere.add(hKnobR);
+flyBody.add(rightHaltere);
+
+// --- F. 6 ARTICULATED LEGS (Aerodynamic Flight Tucking) ---
+function createLeg(startX, startY, startZ, isLeft, isHind) {
+  const legGroup = new THREE.Group();
+  legGroup.position.set(startX, startY, startZ);
+  const side = isLeft ? -1 : 1;
+  const legCylGeo = new THREE.CylinderGeometry(0.02, 0.015, 0.35, 5);
+
+  const femur = new THREE.Mesh(legCylGeo, legMat);
+  femur.position.set(side * 0.1, -0.15, isHind ? 0.12 : -0.05);
+  femur.rotation.z = side * Math.PI * 0.22;
+  femur.rotation.x = isHind ? -Math.PI * 0.25 : Math.PI * 0.15;
+  legGroup.add(femur);
+
+  const tibia = new THREE.Mesh(legCylGeo, legMat);
+  tibia.position.set(side * 0.18, -0.38, isHind ? 0.3 : 0.02);
+  tibia.rotation.z = side * Math.PI * 0.1;
+  tibia.rotation.x = isHind ? -Math.PI * 0.4 : Math.PI * 0.25;
+  legGroup.add(tibia);
+
+  return legGroup;
+}
+
+flyBody.add(createLeg(-0.25, -0.2, -0.25, true, false));
+flyBody.add(createLeg(0.25, -0.2, -0.25, false, false));
+flyBody.add(createLeg(-0.28, -0.25, 0.0, true, false));
+flyBody.add(createLeg(0.28, -0.25, 0.0, false, false));
+flyBody.add(createLeg(-0.22, -0.22, 0.28, true, true));
+flyBody.add(createLeg(0.22, -0.22, 0.28, false, true));
 
 // ==========================================
 // 4. PROCEDURAL OBSTACLES
@@ -1847,10 +2050,21 @@ function animate() {
     }
     playerGroup.position.y = 0.8 + characterY;
 
-    // Wing flapping animation
-    const wingFlap = Math.sin(now * 0.035) * 0.25;
-    leftWing.rotation.z = Math.PI * 0.08 + wingFlap;
-    rightWing.rotation.z = -Math.PI * 0.08 - wingFlap;
+    // High-frequency physiological wing flutter & haltere counter-oscillation
+    const wingBeat = Math.sin(now * 0.065) * 0.28;
+    leftWing.rotation.z = wingBeat;
+    rightWing.rotation.z = -wingBeat;
+
+    // Halteres oscillate in anti-phase to wings (biological gyroscopic stabilization)
+    const haltereBeat = Math.sin(now * 0.065 + Math.PI) * 0.35;
+    leftHaltere.rotation.z = haltereBeat;
+    rightHaltere.rotation.z = -haltereBeat;
+
+    // Dynamic flight banking and aerodynamic pitch
+    const steerDelta = targetX - playerGroup.position.x;
+    flyBody.rotation.z = -steerDelta * 0.25; // Bank into turns
+    flyBody.rotation.y = steerDelta * 0.18;  // Slight yaw
+    flyBody.rotation.x = (velocityY * 0.025) - 0.08; // Pitch with climbing/diving
 
     // 9. Collision Detection & Biological Damage System
     for (let obs of obstacles) {
